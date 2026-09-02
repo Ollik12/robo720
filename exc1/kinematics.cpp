@@ -8,7 +8,7 @@ Kinematics::Kinematics(const float &L1, const float &L2, const float &L3)
 Eigen::Vector2f Kinematics::compute_ee_pos(const float &q1, const float &q2, const float& q3)
 {
     // So we are given joint angled q1, q2 and q2 with private variables for the lengths
-    // Lets calculate the x and y position with joint angles and lengths
+    // Lets calculate the x and y position with joint angles and lengths using trigonometry.
     Eigen::Vector2f positionVector;
     float xPos = L1_ * cos(q1) + L2_ * cos(q1 + q2) + L3_ * cos(q1 + q2 + q3);
     float yPos = L1_ * sin(q1) + L2_ * sin(q1 + q2) + L3_ * sin(q1 + q2 + q3);
