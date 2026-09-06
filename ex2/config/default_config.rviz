@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /RobotModel1
       Splitter Ratio: 0.5
     Tree Height: 361
   - Class: rviz_common/Selection
@@ -80,6 +81,173 @@ Visualization Manager:
       Torque Arrow Scale: 2
       Torque Color: 204; 204; 51
       Value: true
+    - Alpha: 1
+      Class: rviz_default_plugins/RobotModel
+      Collision Enabled: false
+      Description File: ""
+      Description Source: Topic
+      Description Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /robot_description
+      Enabled: true
+      Links:
+        All Links Enabled: true
+        Expand Joint Details: false
+        Expand Link Details: false
+        Expand Tree: false
+        Link Tree Style: Links in Alphabetic Order
+        base:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        fr3_camera_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        fr3_camera_link_optical:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        fr3_ft_sensor_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        fr3_link0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        fr3_link1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        fr3_link2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        fr3_link3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        fr3_link4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        fr3_link5:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        fr3_link6:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        fr3_link7:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        fr3_link8:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        fr3_tool:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        fr3_tool_ball:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        world:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+      Mass Properties:
+        Inertia: false
+        Mass: false
+      Name: RobotModel
+      TF Prefix: ""
+      Update Interval: 0
+      Value: true
+      Visual Enabled: true
+    - Class: rviz_default_plugins/TF
+      Enabled: true
+      Frame Timeout: 15
+      Frames:
+        All Enabled: true
+        base:
+          Value: true
+        fr3_camera_link:
+          Value: true
+        fr3_camera_link_optical:
+          Value: true
+        fr3_ft_sensor_link:
+          Value: true
+        fr3_link0:
+          Value: true
+        fr3_link1:
+          Value: true
+        fr3_link2:
+          Value: true
+        fr3_link3:
+          Value: true
+        fr3_link4:
+          Value: true
+        fr3_link5:
+          Value: true
+        fr3_link6:
+          Value: true
+        fr3_link7:
+          Value: true
+        fr3_link8:
+          Value: true
+        fr3_tool:
+          Value: true
+        fr3_tool_ball:
+          Value: true
+        world:
+          Value: true
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: false
+      Tree:
+        world:
+          base:
+            fr3_link0:
+              fr3_link1:
+                fr3_link2:
+                  fr3_link3:
+                    fr3_link4:
+                      fr3_link5:
+                        fr3_link6:
+                          fr3_link7:
+                            fr3_camera_link:
+                              fr3_camera_link_optical:
+                                {}
+                            fr3_link8:
+                              fr3_ft_sensor_link:
+                                fr3_tool:
+                                  fr3_tool_ball:
+                                    {}
+      Update Interval: 0
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -141,10 +309,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.785398006439209
+      Pitch: 0.7603980302810669
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.785398006439209
+      Yaw: 0.3553980886936188
     Saved: ~
 Window Geometry:
   Displays:
@@ -164,5 +332,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1200
-  X: 419
-  Y: 197
+  X: 387
+  Y: 165
