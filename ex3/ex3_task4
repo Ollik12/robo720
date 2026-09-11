@@ -1,0 +1,31 @@
+Explain the exercise’s control architecture in terms of the paradigms explained on the lecture slides, i.e., 
+sense-think-act, reactivity, behaviors, subsumption, etc.
+
+Well predefined set of actions, which are thought through before the execution happens.
+
+- In our exercise here predefined actions could be following the given trajectory.
+Initially we are given the circle trajectory and then the end-effector will follow that.
+Also following the line/ellipse trajectory is predefined as the end effector follows
+the predefined trajectory.
+
+Sense-think-act logic:
+
+- parameter for enabling/disabling feedforward control. On the update function
+we are continuously checking whether to use this ff_ctrl or not.
+So here the joint_ctrl.cpp is sensing the current joint states from the hardware
+interfaces and comparing them with the desired trajectory. When the user sets
+use_feedforward to true/false then we will act based on enabling/disabling the feedforward controller.
+
+- changing trajectory is based on callback for continuous sending of messages. So via user
+commands we can change the sensed trajectory. The architecture then computes the
+error between the current state and the desired trajectory and acts based on that so that the desired
+trajectory is achieved.
+
+- We are  sensing the current joint states from hardware interfaces and
+computing the error between current states and desired trajectory and acting based on that.
+
+- So all in all, this architecture has both predefined and sense-think-act actions
+so I would personally say that this would land in the world of hybrid control
+architectures as we have predefined actions but we can alter that via user commands
+and act on sensed things such as changing parameters and computing the error to
+decide what action to take.
