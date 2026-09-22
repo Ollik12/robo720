@@ -15,6 +15,7 @@ we are continuously checking whether to use this ff_ctrl or not.
 So here the joint_ctrl.cpp is sensing the current joint states from the hardware
 interfaces and comparing them with the desired trajectory. When the user sets
 use_feedforward to true/false then we will act based on enabling/disabling the feedforward controller.
+This makes the controller's think-step configurable.
 
 - changing trajectory is based on callback for continuous sending of messages. So via user
 commands we can change the sensed trajectory. The architecture then computes the
@@ -29,3 +30,28 @@ so I would personally say that this would land in the world of hybrid control
 architectures as we have predefined actions but we can alter that via user commands
 and act on sensed things such as changing parameters and computing the error to
 decide what action to take.
+
+Conclusions of the control architecture:
+
+Trajectory publisher:
+	- No environmental sensing, but changing trajectory parameter could be interpreted as:
+		○ Sense: Detect a parameter change. Configuration monitoring, no environmental sensing
+		○ Think: Select trajectory generation function. No thinking/planning, 
+		more like deterministic decision logic inside the node
+		○ Act: Generate and publish selected trajectory
+	- Trajectories can be changed at runtime -> Control logic itself remains the same but it starts 
+	tracking different trajectory
+	- No priority-based behaviors so there is no subsumption
+	- No world model or planning
+	- Single competence: generate and publish trajectory joint positions and velocities
+
+Joint controller:
+	- Control logic can be interpreted as a sense-think-act loop:
+		○ Sense: desired joint positions, current joint positions
+		○ Think: compute the control input inside joint controller's update() method 
+		○ Act: send velocity commands to the command interface
+	- Think-step is limited to error computation and a reconfigurable control law, with no world model or planning
+	- Control command is a direct function of the current joint state and the current reference but it can be altered 
+	by changing whether it is using the feedforward 
+	term -> reconfiguring the control logic to use desired velocities as an additional control input
+	- Single competence: tracking the trajectory provided by the trajectory publisher
