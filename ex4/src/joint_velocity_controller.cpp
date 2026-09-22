@@ -55,7 +55,6 @@ controller_interface::return_type JointVelocityController::update_and_write_comm
 
     // now we have all parts to calculate torquie command (tau_)
     tau_ = M_kdl_.data * u + C_kdl_.data + G_kdl_.data;
-    RCLCPP_INFO(get_node()->get_logger(), "tau_: %f, %f, %f, %f, %f, %f, %f", tau_(0), tau_(1), tau_(2), tau_(3), tau_(4), tau_(5), tau_(6));
 
     // Send torque commands to the hardware command interface
     for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
