@@ -87,8 +87,53 @@ TrajectoryPublisher::TrajectoryPublisher()
     trajectory_point_msg_.effort.resize(NUM_JOINTS);
     RCLCPP_INFO(this->get_logger(), "Created a JointTrajectoryPoint publisher.");
 
+<<<<<<< HEAD
     goal_pose_publisher_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("goal_pose", 10);
     RCLCPP_INFO(this->get_logger(), "Created a GoalPose publisher.");
+=======
+    // Register the callback for the parameters
+    param_cb_handle_ =
+    this->add_on_set_parameters_callback(
+        [this](const std::vector<rclcpp::Parameter> & parameters) {
+            return this->set_parameters_callback(parameters);
+        });
+}
+
+// Callback function for parameter changes (only for the trajectory_type parameter at the moment)
+rcl_interfaces::msg::SetParametersResult TrajectoryPublisher::set_parameters_callback(const std::vector<rclcpp::Parameter> & parameters) {
+
+    rcl_interfaces::msg::SetParametersResult result;
+    result.successful = true;
+
+    for (const auto & param : parameters) {
+        if (param.get_name() == "trajectory_type") {
+            const auto new_trajectory_type = param.as_string();
+
+            // Return false if the new trajectory type is not in the list of available trajectories
+            if (std::find(
+                    available_trajectories_.begin(),
+                    available_trajectories_.end(),
+                    new_trajectory_type) == available_trajectories_.end())
+            {
+                result.successful = false;
+                result.reason =
+                    "Invalid trajectory type. Valid options are "
+                    "'circle', 'line', or 'ellipse'.";
+                return result;
+            }
+
+            // Update the trajectory type if it is valid
+            trajectory_type_ = new_trajectory_type;
+
+            RCLCPP_INFO(
+                this->get_logger(),
+                "Trajectory type changed to '%s'.",
+                trajectory_type_.c_str());
+        }
+    }
+
+    return result;
+>>>>>>> 2099ff5 (Added earlier exercise implementations)
 }
 
 void TrajectoryPublisher::line_trajectory(KDL::Vector& tgt_pos, KDL::Twist& tgt_vel, double t) {
@@ -99,9 +144,12 @@ void TrajectoryPublisher::line_trajectory(KDL::Vector& tgt_pos, KDL::Twist& tgt_
 
     tgt_pos.x(pos_x); tgt_pos.y(pos_y); tgt_pos.z(pos_z);
 
-    /**
-     * TODO: Desired velocity
-     */
+    // Compute velocity as a derivative of the position with respect to time
+    double vel_x = 0.0; // No change in x
+    double vel_y = -0.2 * 0.5 * sin(0.5 * t); // Derivative of y with respect to time
+    double vel_z = 0.0; // No change in z
+
+    tgt_vel.vel.x(vel_x); tgt_vel.vel.y(vel_y); tgt_vel.vel.z(vel_z);
 
 }
 
@@ -113,16 +161,29 @@ void TrajectoryPublisher::circle_trajectory(KDL::Vector& tgt_pos, KDL::Twist& tg
 
     tgt_pos.x(pos_x); tgt_pos.y(pos_y); tgt_pos.z(pos_z);
 
-    /**
-     * TODO: Desired velocity
-     */
+    // Compute velocity as a derivative of the position with respect to time
+    double vel_x = 0.0; // No change in x
+    double vel_y = -0.1 * 0.5 * sin(0.5 * t); // Derivative of y with respect to time
+    double vel_z = 0.1 * 0.5 * cos(0.5 * t); // Derivative of z with respect to time
+
+    tgt_vel.vel.x(vel_x); tgt_vel.vel.y(vel_y); tgt_vel.vel.z(vel_z);
 
 }
 
-/**
- * TODO: implement a third type of trajectory here in the same format as
- *       line_trajectory and circle_trajectory above
- */
+// Third trajectory implementation: Ellipse trajectory.
+void TrajectoryPublisher::ellipse_trajectory(KDL::Vector& tgt_pos, KDL::Twist& tgt_vel, double t) {
+    // Desired pose
+    double pos_x = 0.5;
+    double pos_y = 0.01 * cos(0.5 * t);
+    double pos_z = 1.6 + 0.05 * sin(0.5 * t);
+
+    tgt_pos.x(pos_x); tgt_pos.y(pos_y); tgt_pos.z(pos_z);
+
+    // Desired velocity is just derivative of the desired pose.
+    tgt_vel.vel.x(0.0);
+    tgt_vel.vel.y(-0.05 * sin(0.5 * t));
+    tgt_vel.vel.z(0.025 * cos(0.5 * t));
+}
 
 // Subscriber callback for current joint states
 void TrajectoryPublisher::joint_state_callback(const sensor_msgs::msg::JointState& msg) {
@@ -146,10 +207,11 @@ void TrajectoryPublisher::timer_callback() {
     else if (trajectory_type_ == "line") {
         line_trajectory(tgt_pos, tgt_vel, t);
     }
+
+    // There cannot be unknown trajectory type since it is handled in the parameter callback
+    // Publish the ellipse trajectory
     else {
-        /**
-         * TODO: Fail-safe
-         */
+        ellipse_trajectory(tgt_pos, tgt_vel, t); 
     }
 
     KDL::Rotation tgt_rot = KDL::Rotation::EulerZYX(0.0, 0.0, M_PI);
