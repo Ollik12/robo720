@@ -79,6 +79,9 @@ TrajectoryPublisher::TrajectoryPublisher()
         "joint_states", 10, std::bind(&TrajectoryPublisher::joint_state_callback, this, std::placeholders::_1));
     RCLCPP_INFO(this->get_logger(), "Created a JointState subscriber.");
 
+    goal_pose_publisher_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("goal_pose", 10);
+    RCLCPP_INFO(this->get_logger(), "Created a GoalPose publisher.");
+
     // Create publisher
     trajectory_point_publisher_ = this->create_publisher<trajectory_msgs::msg::JointTrajectoryPoint>("trajectory_point", 10);
     timer_ = this->create_wall_timer(100ms, std::bind(&TrajectoryPublisher::timer_callback, this));
@@ -217,6 +220,10 @@ void TrajectoryPublisher::timer_callback() {
     KDL::Rotation tgt_rot = KDL::Rotation::EulerZYX(0.0, 0.0, M_PI);
     double rot_x, rot_y, rot_z, rot_w;
     tgt_rot.GetQuaternion(rot_x, rot_y, rot_z, rot_w);
+<<<<<<< HEAD
+=======
+    
+>>>>>>> 4a24eb1 (Changed ex3 target rotation and added goal pose publisher)
     KDL::Frame tgt_pose(tgt_rot, tgt_pos);
 
     // Solve IK
