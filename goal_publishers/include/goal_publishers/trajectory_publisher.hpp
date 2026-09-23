@@ -35,6 +35,11 @@ class TrajectoryPublisher : public rclcpp::Node
         KDL::JntArray q_dot_cmd_;
 
         std::string trajectory_type_;
+        std::vector<std::string> available_trajectories_ = {"circle", "line", "ellipse"};
+
+        // Parameter callback handle for the trajectory_type parameter
+        rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_cb_handle_;
+        rcl_interfaces::msg::SetParametersResult set_parameters_callback(const std::vector<rclcpp::Parameter> & parameters);
 
         // Joint state subscriber
         rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_subscriber_;
@@ -50,6 +55,8 @@ class TrajectoryPublisher : public rclcpp::Node
         void line_trajectory(KDL::Vector& tgt_pos, KDL::Twist& tgt_vel, double t);
         // Move the end effector in a circle trajectory in yz plane.
         void circle_trajectory(KDL::Vector& tgt_pos, KDL::Twist& tgt_vel, double t);
+        // Move the end effector in a ellipse trajectory.
+        void ellipse_trajectory(KDL::Vector& tgt_pos, KDL::Twist& tgt_vel, double t);
 };
 
 #endif  // ROBO720_2026_GOAL_PUBLISHERS__TRAJECTORY_PUBLISHER_HPP_

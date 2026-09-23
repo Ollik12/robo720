@@ -37,13 +37,19 @@ controller_interface::return_type JointController::update(
 
     // Kinematic controller
     for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
-        double feedback_term = 1 * (qd->positions.at(i) - q_(i));
+        double feedback_term = kp_* (qd->positions.at(i) - q_(i));
+
+        // Compute the commanded joint velocity using a proportional controller
         q_dot_cmd_(i) = feedback_term;
 
+        // Use feedforward control if the parameter is set to true
         if (use_feedforward_.load()) {
-            /**
-             * TODO: Implement feedforward
-             */
+            
+            // q_dot_d is the feedforward term, which is the desired joint velocity from the trajectory message
+            auto q_dot_d = qd->velocities.at(i);
+
+            // Add the feedforward term to the command velocity
+            q_dot_cmd_(i) = q_dot_d + feedback_term;
         }
     }
 
@@ -69,6 +75,8 @@ CallbackReturn JointController::on_init() {
         /**
          * TODO: read the gain(s) from .yaml file to a variable here
          */
+
+        kp_ = auto_declare<double>("gain", kp_);
 
         auto_declare<bool>("use_feedforward", false);
     } 

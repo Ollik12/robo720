@@ -59,6 +59,7 @@ class JointController : public controller_interface::ControllerInterface {
         Vector7d initial_q_;
         Vector7d q_dot_cmd_;
         double elapsed_time_{0.0};
+        double kp_;
 
         // For writing the parameter on non-RT thread and reading it in RT update() loop
         std::atomic<bool> use_feedforward_{false};
