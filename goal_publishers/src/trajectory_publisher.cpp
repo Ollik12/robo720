@@ -7,6 +7,8 @@
 #include <exception>
 
 #include <rclcpp/rclcpp.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <trajectory_msgs/msg/joint_trajectory_point.hpp>
 #include <urdf/model.h>
 #include <kdl/frames.hpp>
 #include <kdl/jntarray.hpp>
@@ -76,6 +78,9 @@ TrajectoryPublisher::TrajectoryPublisher()
     joint_state_subscriber_ = this->create_subscription<sensor_msgs::msg::JointState>(
         "joint_states", 10, std::bind(&TrajectoryPublisher::joint_state_callback, this, std::placeholders::_1));
     RCLCPP_INFO(this->get_logger(), "Created a JointState subscriber.");
+
+    goal_pose_publisher_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("goal_pose", 10);
+    RCLCPP_INFO(this->get_logger(), "Created a GoalPose publisher.");
 
     // Create publisher
     trajectory_point_publisher_ = this->create_publisher<trajectory_msgs::msg::JointTrajectoryPoint>("trajectory_point", 10);
@@ -207,7 +212,10 @@ void TrajectoryPublisher::timer_callback() {
         ellipse_trajectory(tgt_pos, tgt_vel, t); 
     }
 
-    KDL::Rotation tgt_rot = KDL::Rotation::EulerZYX(M_PI_2, M_PI_2, M_PI_2);
+    KDL::Rotation tgt_rot = KDL::Rotation::EulerZYX(0.0, 0.0, M_PI);
+    double rot_x, rot_y, rot_z, rot_w;
+    tgt_rot.GetQuaternion(rot_x, rot_y, rot_z, rot_w);
+    
     KDL::Frame tgt_pose(tgt_rot, tgt_pos);
 
     // Solve IK
@@ -229,6 +237,18 @@ void TrajectoryPublisher::timer_callback() {
         trajectory_point_msg_.positions.at(i) = q_cmd_(i);
         trajectory_point_msg_.velocities.at(i) = q_dot_cmd_(i);
     }
+
+    goal_pose_msg_.header.stamp = this->get_clock()->now();
+    goal_pose_msg_.header.frame_id = root_link_;
+    goal_pose_msg_.pose.position.x = tgt_pos.x();
+    goal_pose_msg_.pose.position.y = tgt_pos.y();
+    goal_pose_msg_.pose.position.z = tgt_pos.z();
+    goal_pose_msg_.pose.orientation.x = rot_x;
+    goal_pose_msg_.pose.orientation.y = rot_y;
+    goal_pose_msg_.pose.orientation.z = rot_z;
+    goal_pose_msg_.pose.orientation.w = rot_w;
+
+    goal_pose_publisher_->publish(goal_pose_msg_);
 
     trajectory_point_publisher_->publish(trajectory_point_msg_);
 }
