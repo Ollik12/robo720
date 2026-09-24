@@ -68,6 +68,9 @@ class TaskSpaceKinematicController : public controller_interface::ControllerInte
 
         double elapsed_time_{0.0};
 
+        // Gain variable for the controller with initial value 2.0 from yaml file
+        double gain_Kp{2.0};
+
         // Subscriber callback 
         void goal_pose_callback(const std::shared_ptr<geometry_msgs::msg::PoseStamped> msg);
 

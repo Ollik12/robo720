@@ -63,6 +63,9 @@ class GCPDController : public controller_interface::ControllerInterface {
         KDL::JntArray q_dot_kdl_;
 
         double elapsed_time_{0.0};
+        // lets define gains as constant here
+        double Kp_ = 20.0;
+        double Kd_ = 2.0;
 
         // Subscriber callback 
         void goal_pose_callback(const std::shared_ptr<geometry_msgs::msg::PoseStamped> msg);

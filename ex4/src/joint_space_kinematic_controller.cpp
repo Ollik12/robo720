@@ -52,14 +52,14 @@ controller_interface::return_type JointSpaceKinematicController::update(
     KDL::JntArray q_d_kdl_(NUM_JOINTS); // given initial size for the controller
     int resultIK = solver_->computeIK(q_kdl_, pose_d, q_d_kdl_);
 
-    // debug
+    // debug when something went wrong with solving inverse kinematics
     if (resultIK < 0) {
         RCLCPP_ERROR(get_node()->get_logger(), "Failed to compute inverse kinematics = %d", resultIK);
         return controller_interface::return_type::ERROR;
     }
 
     // Subtract current joint position from from desired joint pos for error
-    // but as "-" and diff don't work, lets do manually
+    // but as "-" and diff don't compile, lets subtract manually
     for (std::size_t i = 0; i < NUM_JOINTS; ++i)
     {
         q_dot_cmd_(i) = gain_Kp * (q_d_kdl_(i) - q_kdl_(i));
@@ -88,7 +88,7 @@ CallbackReturn JointSpaceKinematicController::on_init() {
         root_link_ = auto_declare<std::string>("root_link", root_link_);
         tip_link_ = auto_declare<std::string>("tip_link", tip_link_);
 
-        // lets read the gain variable in a similar way as ex3 the above and initial value set 1 from .hpp
+        // lets read the gain variable in a similar way as ex3 the above and initial value set 2 from .hpp
         gain_Kp = auto_declare<double>("gain", gain_Kp);
 
     } 

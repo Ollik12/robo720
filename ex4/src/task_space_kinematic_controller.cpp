@@ -44,6 +44,41 @@ controller_interface::return_type TaskSpaceKinematicController::update(
     /**
      * TODO: Implement high-level task space kinematic controller
      */
+    // Input is the desired pose and the output should be written directly
+    // To the q_dot_cmd_ variable into low level controller velocity command interface.
+    // All following equations come from figure 2 of the exercise instructions
+    KDL::Frame Td = pose_d; // desired pose
+    KDL::Frame Te; // current pose comes from the solver
+    int resultFK = solver_->computeFK(q_kdl_, Te);
+    // Debugging if solver does not do what is wanted
+    if (resultFK < 0) {
+        RCLCPP_ERROR(get_node()->get_logger(), "Failed to compute forward kinematics = %d", resultFK);
+        return controller_interface::return_type::ERROR;
+    }
+    // subract current pose from desired pose to get error and multiply with gain to get desired velocity in task space
+    auto kdl_diff_ = KDL::diff(Te, Td);
+    KDL::Twist Vd = gain_Kp * kdl_diff_; // desired
+
+    // we also need to compute pseudo jacobian with q_kdl_ and debug for errors
+    KDL::Jacobian J(NUM_JOINTS);
+    int resultJac = solver_->compute_jac(q_kdl_, J);
+    if (resultJac < 0) {
+        RCLCPP_ERROR(get_node()->get_logger(), "Failed to compute jacobian = %d", resultJac);
+        return controller_interface::return_type::ERROR;
+    }
+
+    //get damped pseudo inverse jacobian
+    Eigen::Matrix<double, NUM_JOINTS, 6> J_pseudo_inv;
+    solver_->get_damped_pseudo_inverse(J.data, J_pseudo_inv);
+
+    // correct format for multiplying the pseudo jacobian 
+    // Format comes from twist documentation
+    Eigen::Vector<double, 6> Vd_eigen;
+    Vd_eigen << Vd.vel(0), Vd.vel(1), Vd.vel(2),
+                Vd.rot(0), Vd.rot(1), Vd.rot(2);
+    // Now dimensions match with 7x6*6x1 for result
+    q_dot_cmd_ = J_pseudo_inv * Vd_eigen;
+
 
     // Send velocity commands to the low-level controller
     for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
@@ -66,6 +101,10 @@ CallbackReturn TaskSpaceKinematicController::on_init() {
 
         root_link_ = auto_declare<std::string>("root_link", root_link_);
         tip_link_ = auto_declare<std::string>("tip_link", tip_link_);
+
+        // lets read the gain variable in a similar way as ex3 the above and initial value set 1 from .hpp
+        gain_Kp = auto_declare<double>("gain", gain_Kp);
+
     } 
     catch (const std::exception& e) {
         fprintf(stderr, "Exception thrown during init stage (on_init) with message: %s \n", e.what());

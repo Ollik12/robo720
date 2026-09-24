@@ -44,9 +44,6 @@ controller_interface::return_type GCPDController::update(
     // Here we need to implement a formula: tau = u = g(q) + Kp*q~ - Kd*q_dot
     // q~ is the notation for q_d-q and q_dot is 
     // We alsio have q_kdl and q_dot_kdl which are current joint positions and velocities and then g(q) is the gravity comp. from solver_
-    // lets define gains as constant here
-    double Kp_ = 1.0;
-    double Kd_ = 0.1;
 
     // Cartesian pose to desired joint positions using inverse kinematics
     KDL::JntArray q_d_kdl_(NUM_JOINTS);
