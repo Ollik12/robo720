@@ -62,6 +62,10 @@ class GCPDController : public controller_interface::ControllerInterface {
         KDL::JntArray q_kdl_;
         KDL::JntArray q_dot_kdl_;
 
+        // Gains for PD controller
+        double Kp_{1.5};
+        double Kd_{2.0};
+
         double elapsed_time_{0.0};
 
         // Subscriber callback 
