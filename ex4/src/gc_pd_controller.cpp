@@ -42,8 +42,31 @@ controller_interface::return_type GCPDController::update(
     KDL::Frame pose_d(rot_d, pos_d);
 
     /**
-     * TODO: Implement gravity compensation + PD
+     *  Gravity compensation + PD
      */
+
+    // Compute desired joint angles from target pose using inverse kinematics
+    KDL::JntArray qd(NUM_JOINTS);
+    int ik_ok = solver_->computeIK(q_kdl_, pose_d, qd);
+    // Check if inverse kinematics was successful
+    if (ik_ok < 0) {
+        RCLCPP_ERROR(get_node()->get_logger(), "Inverse kinematics failed");
+        return controller_interface::return_type::ERROR;
+    }
+
+    // Gravity compensation tau_g using class solver (it uses the KDL::ChainDynParam->JntToGravity() method which returns the gravity vector tau_g)
+    KDL::JntArray tau_g(NUM_JOINTS);
+    int gravity_ok = solver_->compute_gravity_vector(q_kdl_, tau_g);
+
+    if (gravity_ok < 0) {
+        RCLCPP_ERROR(get_node()->get_logger(), "Gravity compensation failed");
+        return controller_interface::return_type::ERROR;
+    }
+    
+    // PD control law: tau = tau_g(q) + Kp*(qd - q) - Kd*q_dot
+    for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
+        tau_(i) = tau_g(i) + Kp_ *(qd(i) - q_kdl_(i)) - Kd_ * q_dot_kdl_(i);
+    }   
 
     // Send torque commands to the hardware command interface
     for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
