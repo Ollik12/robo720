@@ -45,6 +45,40 @@ controller_interface::return_type TaskSpaceKinematicController::update(
      * TODO: Implement high-level task space kinematic controller
      */
 
+    // Compute current end-effector pose using forward kinematics
+    KDL::Frame pose_current;
+    int fk_ok = solver_->computeFK(q_kdl_, pose_current);
+
+    if (fk_ok < 0) {
+        RCLCPP_ERROR(get_node()->get_logger(), "Forward kinematics computation failed");
+        return controller_interface::return_type::ERROR;
+    }
+
+    // Compute Jacobian matrix using the solver
+    KDL::Jacobian J(NUM_JOINTS);
+    int jac_ok = solver_->compute_jac(q_kdl_, J);
+
+    if (jac_ok < 0) {
+        RCLCPP_ERROR(get_node()->get_logger(), "Jacobian computation failed");
+        return controller_interface::return_type::ERROR;
+    }
+
+    // Use KDL::diff to compute the difference between the current pose and the desired pose
+    KDL::Twist pose_diff = KDL::diff(pose_current, pose_d, elapsed_time_);
+
+    // Convert KDL::Twist to Eigen vector for easier manipulation
+    Eigen::VectorXd pose_diff_eigen(6);
+    pose_diff_eigen << pose_diff.vel.x(), pose_diff.vel.y(), pose_diff.vel.z(), 
+    pose_diff.rot.x(), pose_diff.rot.y(), pose_diff.rot.z();
+
+    // Compute the desired joint velocities using the Jacobian pseudo-inverse
+    Eigen::MatrixXd J_eigen = J.data;
+    Eigen::MatrixXd J_pseudo_inv(NUM_JOINTS, 6);
+    J_pseudo_inv = J_eigen.completeOrthogonalDecomposition().pseudoInverse();
+
+    // Compute the desired joint velocities using the Jacobian pseudo-inverse and the pose difference eigen vector
+    q_dot_cmd_ = J_pseudo_inv * Kp_ * pose_diff_eigen;
+
     // Send velocity commands to the low-level controller
     for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
         command_interfaces_[i].set_value(q_dot_cmd_(i));

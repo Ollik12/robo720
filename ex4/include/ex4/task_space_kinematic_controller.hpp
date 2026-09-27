@@ -66,6 +66,9 @@ class TaskSpaceKinematicController : public controller_interface::ControllerInte
         // KDL variables
         KDL::JntArray q_kdl_;
 
+        // Gain for proportional controller
+        double Kp_{10.0};
+
         double elapsed_time_{0.0};
 
         // Subscriber callback 

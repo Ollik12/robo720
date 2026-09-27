@@ -45,6 +45,20 @@ controller_interface::return_type JointSpaceKinematicController::update(
      * TODO: Implement high-level joint space kinematic controller
      */
 
+    // Desired joint positions (output of the kinematic controller)
+    KDL::JntArray qd(NUM_JOINTS);
+    int ik_ok = solver_->computeIK(q_kdl_, pose_d, qd);
+
+    if (ik_ok < 0) {
+        RCLCPP_ERROR(get_node()->get_logger(), "Inverse kinematics computation failed");
+        return controller_interface::return_type::ERROR;
+    }
+
+    // Compute joint velocity commands (simple proportional controller)
+    for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
+        q_dot_cmd_(i) = Kp_ * (qd(i) - q_kdl_(i));
+    }
+
     // Send velocity commands to the low-level controller
     for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
         command_interfaces_[i].set_value(q_dot_cmd_(i));
