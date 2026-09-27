@@ -39,8 +39,24 @@ controller_interface::return_type JointVelocityController::update_and_write_comm
     }
 
     /**
-     * TODO: Implement low-level velocity controller
+     *  Low-level velocity controller
      */
+
+    // Compute Mass matrix M(q), Coriolis vector C(q, q_dot), and Gravity vector g(q) using the solver
+    int dyn_ok = solver_->compute_dyn_params(q_kdl_, q_dot_kdl_, M_, g_, C_);
+
+    // Check if dynamics computation was successful
+    if (dyn_ok < 0) {
+        RCLCPP_ERROR(get_node()->get_logger(), "Dynamics computation failed");
+        return controller_interface::return_type::ERROR;
+    }
+
+    // Controller input
+    Vector7d u = Kd_ * (qd_dot_ - q_dot_kdl_.data); // desired joint velocities - current joint velocities
+
+    // Compute torque command using the control law: tau = M(q) * u + C(q, q_dot) + g(q)
+    // Convert KDL objects to Eigen objects for matrix operations
+    tau_ = M_.data * u + C_.data + g_.data;
 
     // Send torque commands to the hardware command interface
     for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
@@ -172,6 +188,9 @@ CallbackReturn JointVelocityController::on_activate(
 
     q_kdl_.resize(NUM_JOINTS);
     q_dot_kdl_.resize(NUM_JOINTS);
+    M_.resize(NUM_JOINTS);
+    C_.resize(NUM_JOINTS);
+    g_.resize(NUM_JOINTS);
 
     // Initialize realtime buffer
     auto msg = std::make_shared<trajectory_msgs::msg::JointTrajectoryPoint>();

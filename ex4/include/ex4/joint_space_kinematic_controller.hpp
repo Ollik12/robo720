@@ -63,6 +63,9 @@ class JointSpaceKinematicController : public controller_interface::ControllerInt
         // KDL variables
         KDL::JntArray q_kdl_;
 
+        // Gain for proportional controller
+        double Kp_{2.0};
+
         double elapsed_time_{0.0};
 
         // Subscriber callback 
