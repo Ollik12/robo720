@@ -40,12 +40,11 @@ controller_interface::return_type VisualController::update(
     // Get the current EE pose
     solver_->computeFK(q_kdl_, x_kdl_);
 
-    // Load the markerpose boolean
+    // Load the markerpose boolean to decide whether to follow the wave trajectory or track the marker pose
     const bool marker_received = marker_pose_received_.load();
 
-    // Let's add also a ros2 parameter to switch between two modes
-    // with a callback function to set the parameter value
-    if (!marker_received) {  // Follow wave trajectory
+    if (!marker_received) {
+        // follow wave trajectory when marker pose is not received
         xd_kdl_ = *rt_trajectory_buffer_.readFromRT()->get();
     }
     else {  // Track the marker when marker pose is received
@@ -58,29 +57,31 @@ controller_interface::return_type VisualController::update(
         int res = camera_chain_fk_solver_->JntToCart(q_kdl_, T_base_cam);
 
         if (res < 0) {
-            // Add debugging information to the error message
+            // Add debugging information to the error message if one occurs
             RCLCPP_ERROR(
                 get_node()->get_logger(),
                 "Failed to compute forward kinematics for camera chain.");
             return controller_interface::return_type::ERROR;
         }
 
-        /**
-         * TODO: fix pose to be better aligned with the marker, as the current implementation is not accurate enough
-         */
-
         // Now we have frames from base to camera and from camera to marker,
-        // we can compute the frame from base to marker by multiplying frames
+        // we can compute the frame from base to marker by multiplying
         KDL::Frame T_Base_Marker = T_base_cam * T_cam_marker_;
 
-        // setting of desired pose to be on top of the marker in base frame
+        // Also lets set some offset to the marker pose so that the robot
+        // does not collide with the marker
         xd_kdl_.p = T_Base_Marker.p;
 
-        // Offset above marker in base frame (0.5 works best fdor some reason)
-        xd_kdl_.p.z(xd_kdl_.p.z() + 0.50);
+        // Offset above marker in base frame (0.5m above marker)
+        xd_kdl_.p.z(xd_kdl_.p.z() + 0.5);
 
-        // Keep current orientation
-        xd_kdl_.M = x_kdl_.M;
+        // Keep static orientation of the end effector (pointing downwards) for now
+        // TODO: this might be needed to change
+        xd_kdl_.M = KDL::Rotation::RPY(M_PI, 0.0, 0.0);
+
+        /**
+         * TODO: set desired pose on top of the marker
+         */
     }
 
     // Get the error in task space
