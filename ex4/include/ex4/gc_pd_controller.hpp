@@ -64,7 +64,7 @@ class GCPDController : public controller_interface::ControllerInterface {
 
         // Gains for PD controller
         double Kp_{1.5};
-        double Kd_{2.0};
+        double Kd_{3.0};
 
         double elapsed_time_{0.0};
 

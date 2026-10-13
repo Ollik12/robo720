@@ -45,7 +45,7 @@ controller_interface::return_type JointSpaceKinematicController::update(
      * TODO: Implement high-level joint space kinematic controller
      */
 
-    // Desired joint positions (output of the kinematic controller)
+    // Desired joint positions 
     KDL::JntArray qd(NUM_JOINTS);
     int ik_ok = solver_->computeIK(q_kdl_, pose_d, qd);
 

@@ -80,7 +80,7 @@ class JointVelocityController : public controller_interface::ChainableController
         KDL::JntArray q_dot_kdl_;
 
         // Derivative gain
-        double Kd_{10.0};
+        double Kd_{5.0};
         KDL::JntSpaceInertiaMatrix M_; // mass matrix
         KDL::JntArray C_; // coriolis vector
         KDL::JntArray g_; // gravity vector

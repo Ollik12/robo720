@@ -63,18 +63,17 @@ controller_interface::return_type TaskSpaceKinematicController::update(
         return controller_interface::return_type::ERROR;
     }
 
-    // Use KDL::diff to compute the difference between the current pose and the desired pose
-    KDL::Twist pose_diff = KDL::diff(pose_current, pose_d, elapsed_time_);
+    // Use KDL::diff to compute the twist (linear and angular velocity) between the current pose and the desired pose
+    KDL::Twist pose_diff = KDL::diff(pose_current, pose_d);
 
-    // Convert KDL::Twist to Eigen vector for easier manipulation
+    // Convert KDL::Twist to Eigen vector 
     Eigen::VectorXd pose_diff_eigen(6);
     pose_diff_eigen << pose_diff.vel.x(), pose_diff.vel.y(), pose_diff.vel.z(), 
     pose_diff.rot.x(), pose_diff.rot.y(), pose_diff.rot.z();
 
-    // Compute the desired joint velocities using the Jacobian pseudo-inverse
-    Eigen::MatrixXd J_eigen = J.data;
-    Eigen::MatrixXd J_pseudo_inv(NUM_JOINTS, 6);
-    J_pseudo_inv = J_eigen.completeOrthogonalDecomposition().pseudoInverse();
+    // Compute the Jacobian pseudo-inverse
+    Eigen::Matrix<double, NUM_JOINTS, 6> J_pseudo_inv;
+    solver_->get_damped_pseudo_inverse(J.data, J_pseudo_inv);
 
     // Compute the desired joint velocities using the Jacobian pseudo-inverse and the pose difference eigen vector
     q_dot_cmd_ = J_pseudo_inv * Kp_ * pose_diff_eigen;
