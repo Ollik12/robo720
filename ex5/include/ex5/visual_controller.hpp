@@ -65,7 +65,7 @@ class VisualController : public controller_interface::ControllerInterface {
         KDL::Chain chain_;
         KDL::Chain camera_chain_;
         std::unique_ptr<Solver> solver_;
-        std::unique_ptr<KDL::ChainFkSolverPos_recursive> camera_chain_fk_solver_;
+        std::unique_ptr<Solver> camera_chain_fk_solver_;
 
         rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr
         parameter_callback_handle_;

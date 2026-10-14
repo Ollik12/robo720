@@ -54,34 +54,23 @@ controller_interface::return_type VisualController::update(
 
         // As the marker pose is in camera optical frame, we need to transform it to the robot base frame
         // but first feature is extracted so lets get frame from base to camera optical frame as seen in lecture slides
-        int res = camera_chain_fk_solver_->JntToCart(q_kdl_, T_base_cam);
 
-        if (res < 0) {
-            // Add debugging information to the error message if one occurs
-            RCLCPP_ERROR(
-                get_node()->get_logger(),
-                "Failed to compute forward kinematics for camera chain.");
-            return controller_interface::return_type::ERROR;
-        }
+        // now we calculate forwkinematics for the camera
+        camera_chain_fk_solver_->computeFK(q_kdl_, T_base_cam);
 
         // Now we have frames from base to camera and from camera to marker,
-        // we can compute the frame from base to marker by multiplying
+        // we can compute the frame from base to marker by multiplying gotten frames
         KDL::Frame T_Base_Marker = T_base_cam * T_cam_marker_;
 
-        // Also lets set some offset to the marker pose so that the robot
-        // does not collide with the marker
+        // setting the desired pose to be 0.5m above the marker in base frame
         xd_kdl_.p = T_Base_Marker.p;
 
         // Offset above marker in base frame (0.5m above marker)
         xd_kdl_.p.z(xd_kdl_.p.z() + 0.5);
 
-        // Keep static orientation of the end effector (pointing downwards) for now
-        // TODO: this might be needed to change
-        xd_kdl_.M = KDL::Rotation::RPY(M_PI, 0.0, 0.0);
-
-        /**
-         * TODO: set desired pose on top of the marker
-         */
+        // NOTE: end effector orientation is rotated by PI compared to the aruco marker
+        // so let's rotate the marker orientation by PI around X axis to align with the end effector orientation
+        xd_kdl_.M = T_Base_Marker.M * KDL::Rotation::RotX(M_PI);
     }
 
     // Get the error in task space
@@ -225,7 +214,7 @@ CallbackReturn VisualController::on_configure(
     }
     // Lets also create a solver for this new chain as the chain_ is from base to End effector
     // this solver is from base to camera optical frame
-    camera_chain_fk_solver_ = std::make_unique<KDL::ChainFkSolverPos_recursive>(camera_chain_);
+    camera_chain_fk_solver_.reset(new Solver(camera_chain_));
 
     RCLCPP_INFO(
         get_node()->get_logger(),
@@ -306,6 +295,7 @@ CallbackReturn VisualController::on_activate(
     q_dot_kdl_.resize(NUM_JOINTS);
 
     T_cam_marker_ = KDL::Frame::Identity();
+    T_base_cam = KDL::Frame::Identity();
 
     return CallbackReturn::SUCCESS;
 }
