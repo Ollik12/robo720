@@ -59,10 +59,13 @@ class VisualController : public controller_interface::ControllerInterface {
         std::vector<std::string> joint_names_;
         std::string root_link_;
         std::string tip_link_;
+        std::string optical_link_;
 
         KDL::Tree tree_;
         KDL::Chain chain_;
+        KDL::Chain cam_chain_; // KDL chain from end effector to camera frame
         std::unique_ptr<Solver> solver_;
+        std::unique_ptr<Solver> cam_solver_; // KDL solver for camera chain
 
         // Eigen variables
         Eigen::Matrix<double, NUM_JOINTS, NUM_JOINTS> M_;
@@ -91,8 +94,12 @@ class VisualController : public controller_interface::ControllerInterface {
         KDL::Frame x_kdl_;
         KDL::Frame xd_kdl_;
         KDL::Twist xe_kdl_;
+        KDL::Frame T_base_cam_; // Transformation from base_link to camera frame
+        KDL::Frame T_base_marker_; // Transformation from base_link to marker frame
+        KDL::Vector marker_offset_; // Offset from marker to desired end effector position
 
         double elapsed_time_{0.0};
+        bool marker_detected_{false};
 
         std::vector<double> p_gains_;
         std::vector<double> d_gains_;

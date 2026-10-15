@@ -42,16 +42,24 @@ controller_interface::return_type VisualController::update(
     solver_->computeFK(q_kdl_, x_kdl_);
 
     // TODO: define some flag for switching behavior once marker is detected
-    if (true) {  // Follow wave trajectory
+    if (!marker_detected_) {  // Follow wave trajectory
         xd_kdl_ = *rt_trajectory_buffer_.readFromRT()->get();
     }
     else {  // Track the marker
-        // Read the marker pose
+        // Read the marker pose (camera optical frame)
         T_cam_marker_ = *rt_marker_pose_buffer_.readFromRT()->get();
 
-        /**
-         * TODO: set desired pose on top of the marker
-         */
+        // Get the current camera pose in base frame
+        cam_solver_->computeFK(q_kdl_, T_base_cam_);  
+
+        // Transform the marker pose from camera frame to base frame
+        T_base_marker_ = T_base_cam_ * T_cam_marker_;
+        
+        // Set the desired end effector pose to be above the marker with a fixed offset
+        KDL::Vector p_desired = T_base_marker_.p + marker_offset_; // Add offset (in z-axis) to keep the end effector above the marker
+
+        xd_kdl_.p = p_desired;
+        xd_kdl_.M = T_base_marker_.M * KDL::Rotation::RotX(M_PI);  // Ser desired orientation to be aligned with the marker, but flipped in x-axis
     }
 
     // Get the error in task space
@@ -107,6 +115,7 @@ CallbackReturn VisualController::on_init() {
 
         root_link_ = auto_declare<std::string>("root_link", root_link_);
         tip_link_ = auto_declare<std::string>("tip_link", tip_link_);
+        optical_link_ = auto_declare<std::string>("optical_link", optical_link_);
 
         p_gains_ = auto_declare<std::vector<double>>("p_gains", p_gains_);
         d_gains_ = auto_declare<std::vector<double>>("d_gains", d_gains_);
@@ -116,6 +125,9 @@ CallbackReturn VisualController::on_init() {
         for (std::size_t i = 0; i < NUM_TASK; ++i) {
             Kp_(i) = p_gains_.at(i);
         }
+
+        // Set offset vector from marker to desired end effector position
+        marker_offset_ = KDL::Vector(0.0, 0.0, 0.5); // 50 cm above the marker
     } 
     catch (const std::exception& e) {
         fprintf(stderr, "Exception thrown during init stage (on_init) with message: %s \n", e.what());
@@ -176,8 +188,21 @@ CallbackReturn VisualController::on_configure(
         kdl_chain_success_print(tip_link_, chain_);
     }
 
+    // Get the KDL chain from KDL tree for camera optical frame
+    if (!tree_.getChain(root_link_, optical_link_, cam_chain_)) {
+        kdl_chain_error_print(optical_link_);
+
+        return CallbackReturn::ERROR;
+    }
+    else {
+        kdl_chain_success_print(optical_link_, cam_chain_);
+    }
+
     // Create a Solver instance
     solver_.reset(new Solver(chain_));
+
+    // Create a Solver instance for the camera chain
+    cam_solver_.reset(new Solver(cam_chain_));
 
     // Create a subscription for the joint command
     marker_pose_subscriber_ = get_node()->create_subscription<std_msgs::msg::Float64MultiArray>(
@@ -293,6 +318,7 @@ void VisualController::marker_pose_callback(const std::shared_ptr<std_msgs::msg:
         auto T_cam_marker = std::make_shared<KDL::Frame>(
             KDL::Frame(KDL::Rotation(xx, xy, xz, yx, yy, yz, zx, zy, zz), KDL::Vector(tx, ty, tz)));
         rt_marker_pose_buffer_.writeFromNonRT(T_cam_marker);
+        marker_detected_ = true;
     }
 }
 

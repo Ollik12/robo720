@@ -90,13 +90,9 @@ TrajectoryPublisher::TrajectoryPublisher()
     trajectory_point_msg_.effort.resize(NUM_JOINTS);
     RCLCPP_INFO(this->get_logger(), "Created a JointTrajectoryPoint publisher.");
 
-<<<<<<< HEAD
-<<<<<<< HEAD
     goal_pose_publisher_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("goal_pose", 10);
     RCLCPP_INFO(this->get_logger(), "Created a GoalPose publisher.");
-=======
-=======
->>>>>>> 25e5a0ae55c3cc6be1d68cdfbd13d632888b712e
+
     // Register the callback for the parameters
     param_cb_handle_ =
     this->add_on_set_parameters_callback(
@@ -139,10 +135,6 @@ rcl_interfaces::msg::SetParametersResult TrajectoryPublisher::set_parameters_cal
     }
 
     return result;
-<<<<<<< HEAD
->>>>>>> 2099ff5 (Added earlier exercise implementations)
-=======
->>>>>>> 25e5a0ae55c3cc6be1d68cdfbd13d632888b712e
 }
 
 void TrajectoryPublisher::line_trajectory(KDL::Vector& tgt_pos, KDL::Twist& tgt_vel, double t) {
@@ -226,14 +218,7 @@ void TrajectoryPublisher::timer_callback() {
     KDL::Rotation tgt_rot = KDL::Rotation::EulerZYX(0.0, 0.0, M_PI);
     double rot_x, rot_y, rot_z, rot_w;
     tgt_rot.GetQuaternion(rot_x, rot_y, rot_z, rot_w);
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-    
->>>>>>> 4a24eb1 (Changed ex3 target rotation and added goal pose publisher)
-=======
-    
->>>>>>> 25e5a0ae55c3cc6be1d68cdfbd13d632888b712e
+
     KDL::Frame tgt_pose(tgt_rot, tgt_pos);
 
     // Solve IK

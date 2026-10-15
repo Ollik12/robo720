@@ -91,6 +91,10 @@ def generate_launch_description():
         output="both",
     )
 
+    gz_config = os.path.join(
+        get_package_share_directory("ex5"), "config", "ex5_gz.config"
+    )
+
     # GZ nodes
     gz_spawn_entity = Node(
         package="ros_gz_sim",
@@ -111,15 +115,21 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             [FindPackageShare("ros_gz_sim"), "/launch/gz_sim.launch.py"]
         ),
-        launch_arguments={"gz_args": f" -r -v 1 {world_file}"}.items(),
+        launch_arguments={"gz_args": f" -r --gui-config {gz_config} -v 1 {world_file}"}.items(),
     )
 
     # RViz node
+    rviz_config = os.path.join(
+        get_package_share_directory("ex5"), "config", "ex5.rviz"
+    )
+
     rviz_node = Node(
         package="rviz2",
         executable="rviz2",
         output="screen",
-        arguments=[]
+        arguments=[
+            "-d", rviz_config
+        ]
     )
 
     # Bridge Gazebo topics to ROS
