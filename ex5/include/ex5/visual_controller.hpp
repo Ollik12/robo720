@@ -63,7 +63,7 @@ class VisualController : public controller_interface::ControllerInterface {
 
         KDL::Tree tree_;
         KDL::Chain chain_;
-        KDL::Chain cam_chain_; // KDL chain from end effector to camera frame
+        KDL::Chain cam_chain_; // KDL chain from root_link to optical_link
         std::unique_ptr<Solver> solver_;
         std::unique_ptr<Solver> cam_solver_; // KDL solver for camera chain
 
@@ -96,7 +96,7 @@ class VisualController : public controller_interface::ControllerInterface {
         KDL::Twist xe_kdl_;
         KDL::Frame T_base_cam_; // Transformation from base_link to camera frame
         KDL::Frame T_base_marker_; // Transformation from base_link to marker frame
-        KDL::Vector marker_offset_; // Offset from marker to desired end effector position
+        KDL::Vector marker_offset_{0.0, 0.0, 0.5}; // Offset from marker to desired end effector position
 
         double elapsed_time_{0.0};
         bool marker_detected_{false};

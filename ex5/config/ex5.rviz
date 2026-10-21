@@ -149,7 +149,7 @@ Visualization Manager:
         fr3_camera_link:
           Value: false
         fr3_camera_link_optical:
-          Value: true
+          Value: false
         fr3_link0:
           Value: false
         fr3_link1:
@@ -258,10 +258,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7403973340988159
+      Pitch: 0.4803972840309143
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.18539974093437195
+      Yaw: 0.395399808883667
     Saved: ~
 Window Geometry:
   Displays:
@@ -279,5 +279,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1200
-  X: 1233
-  Y: 27
+  X: 1534
+  Y: 167

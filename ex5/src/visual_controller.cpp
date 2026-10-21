@@ -41,25 +41,29 @@ controller_interface::return_type VisualController::update(
     // Get the current EE pose
     solver_->computeFK(q_kdl_, x_kdl_);
 
-    // TODO: define some flag for switching behavior once marker is detected
+    // marker_detected_ flag for switching behavior once marker is detected
     if (!marker_detected_) {  // Follow wave trajectory
         xd_kdl_ = *rt_trajectory_buffer_.readFromRT()->get();
     }
     else {  // Track the marker
+
         // Read the marker pose (camera optical frame)
         T_cam_marker_ = *rt_marker_pose_buffer_.readFromRT()->get();
 
         // Get the current camera pose in base frame
+        // Transformation from base frame to camera optical frame
         cam_solver_->computeFK(q_kdl_, T_base_cam_);  
 
-        // Transform the marker pose from camera frame to base frame
+        // Transform the marker pose from camera optical frame to base frame
         T_base_marker_ = T_base_cam_ * T_cam_marker_;
         
         // Set the desired end effector pose to be above the marker with a fixed offset
         KDL::Vector p_desired = T_base_marker_.p + marker_offset_; // Add offset (in z-axis) to keep the end effector above the marker
 
+        // Set the desired end effector position
         xd_kdl_.p = p_desired;
-        xd_kdl_.M = T_base_marker_.M * KDL::Rotation::RotX(M_PI);  // Ser desired orientation to be aligned with the marker, but flipped in x-axis
+        // Set desired orientation to be aligned with the marker, but flipped in x-axis 180 degrees (to point downwards)
+        xd_kdl_.M = T_base_marker_.M * KDL::Rotation::RotX(M_PI);
     }
 
     // Get the error in task space
@@ -126,8 +130,6 @@ CallbackReturn VisualController::on_init() {
             Kp_(i) = p_gains_.at(i);
         }
 
-        // Set offset vector from marker to desired end effector position
-        marker_offset_ = KDL::Vector(0.0, 0.0, 0.5); // 50 cm above the marker
     } 
     catch (const std::exception& e) {
         fprintf(stderr, "Exception thrown during init stage (on_init) with message: %s \n", e.what());
@@ -319,6 +321,9 @@ void VisualController::marker_pose_callback(const std::shared_ptr<std_msgs::msg:
             KDL::Frame(KDL::Rotation(xx, xy, xz, yx, yy, yz, zx, zy, zz), KDL::Vector(tx, ty, tz)));
         rt_marker_pose_buffer_.writeFromNonRT(T_cam_marker);
         marker_detected_ = true;
+    }
+    else {
+        marker_detected_ = false;
     }
 }
 
