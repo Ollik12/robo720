@@ -124,7 +124,7 @@ def generate_launch_description():
         package="rviz2",
         executable="rviz2",
         output="screen",
-        arguments=[]
+        arguments=["-d", rviz_config]
     )
 
     # Bridge Gazebo topics to ROS

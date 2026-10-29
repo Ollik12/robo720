@@ -100,6 +100,9 @@ class VisualController : public controller_interface::ControllerInterface {
         KDL::Frame T_base_cam;
 
         double elapsed_time_{0.0};
+        double initial_timeout_{0.0};
+        double marker_lost_time_{0.0};
+        bool marker_tracking_active_{false};
 
         std::vector<double> p_gains_;
         std::vector<double> d_gains_;

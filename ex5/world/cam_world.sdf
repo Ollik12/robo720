@@ -295,11 +295,38 @@
       <name>table1</name>
       <pose> 0.65 0 0 0 0 0</pose>
     </include> 
-    
+
+    <!-- 3D scene 
+    extra tables for testing
+    <include>
+      <uri>model://table</uri>
+      <name>table2</name>
+      <pose> 0 0.65 0 0 0 1.5708</pose>
+    </include> 
+
+    <include>
+      <uri>model://table</uri>
+      <name>table3</name>
+      <pose> 0 -0.65 0 0 0 1.5708</pose>
+    </include> 
+
     <include>
       <uri>model://aruco_marker_0_100mm</uri>
       <name>marker</name>
       <pose> 0.7 0 0.845 0.0 0.0 0</pose>
+    </include>
+    -->
+
+    <include>
+      <uri>model://marker_cube</uri>
+      <name>marker_cube</name>
+      <pose>0.7 0 0.918 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>model://marker_cube</uri>
+      <name>marker_cube1</name>
+      <pose>0.7 0 1.068 0 0 0</pose>
     </include>
 
   </world>

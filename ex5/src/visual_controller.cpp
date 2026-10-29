@@ -36,41 +36,44 @@ controller_interface::return_type VisualController::update(
         q_kdl_(i) = position_interface_vals_(i);
         q_dot_kdl_(i) = velocity_interface_vals_(i);
     }
-
+    initial_timeout_ = initial_timeout_ + dt;
     // Get the current EE pose
     solver_->computeFK(q_kdl_, x_kdl_);
 
     // Load the markerpose boolean to decide whether to follow the wave trajectory or track the marker pose
     const bool marker_received = marker_pose_received_.load();
 
-    if (!marker_received) {
-        // follow wave trajectory when marker pose is not received
+    if (!marker_received ) { // to have control of what behaviour done, put "or !use_marker_top_pose_.load()"
+        // Follow the wave trajectory before marker tracking starts.
         xd_kdl_ = *rt_trajectory_buffer_.readFromRT()->get();
-    }
-    else {  // Track the marker when marker pose is received
 
-        // Read the marker pose
-        T_cam_marker_ = *rt_marker_pose_buffer_.readFromRT()->get();
+    } else {  // Track the marker when marker pose is received
+        marker_lost_time_ = 0.0;
+        if (initial_timeout_ > 1.0) {
+            // Read the marker pose
+            T_cam_marker_ = *rt_marker_pose_buffer_.readFromRT()->get();
 
-        // As the marker pose is in camera optical frame, we need to transform it to the robot base frame
-        // but first feature is extracted so lets get frame from base to camera optical frame as seen in lecture slides
+            // As the marker pose is in camera optical frame, we need to transform it to the robot base frame
+            // but first feature is extracted so lets get frame from base to camera optical frame as seen in lecture slides
 
-        // now we calculate forwkinematics for the camera
-        camera_chain_fk_solver_->computeFK(q_kdl_, T_base_cam);
+            // now we calculate forwkinematics for the camera
+            camera_chain_fk_solver_->computeFK(q_kdl_, T_base_cam);
 
-        // Now we have frames from base to camera and from camera to marker,
-        // we can compute the frame from base to marker by multiplying gotten frames
-        KDL::Frame T_Base_Marker = T_base_cam * T_cam_marker_;
+            // Now we have frames from base to camera and from camera to marker,
+            // we can compute the frame from base to marker by multiplying gotten frames
+            KDL::Frame T_Base_Marker = T_base_cam * T_cam_marker_;
 
-        // setting the desired pose to be 0.5m above the marker in base frame
-        xd_kdl_.p = T_Base_Marker.p;
+            // setting the desired pose to be 0.5m above the marker in base frame
+            xd_kdl_.p = T_Base_Marker.p;
 
-        // Offset above marker in base frame (0.5m above marker)
-        xd_kdl_.p.z(xd_kdl_.p.z() + 0.5);
+            // Offset above marker in base frame (0.5m above marker)
+            xd_kdl_.p.z(xd_kdl_.p.z() + 0.3);
 
-        // NOTE: end effector orientation is rotated by PI compared to the aruco marker
-        // so let's rotate the marker orientation by PI around X axis to align with the end effector orientation
-        xd_kdl_.M = T_Base_Marker.M * KDL::Rotation::RotX(M_PI);
+            // NOTE: end effector orientation is rotated by PI compared to the aruco marker
+            // so let's rotate the marker orientation by PI around X axis to align with the end effector orientation
+            xd_kdl_.M = T_Base_Marker.M * KDL::Rotation::RotX(M_PI);
+            marker_tracking_active_ = true;
+        }
     }
 
     // Get the error in task space
@@ -216,12 +219,6 @@ CallbackReturn VisualController::on_configure(
     // this solver is from base to camera optical frame
     camera_chain_fk_solver_.reset(new Solver(camera_chain_));
 
-    RCLCPP_INFO(
-        get_node()->get_logger(),
-        "Arm chain joints: %u, camera chain joints: %u, q_kdl size: %u",
-        chain_.getNrOfJoints(),
-        camera_chain_.getNrOfJoints(),
-        q_kdl_.rows());
 
     // Parameter callback for debugging
     parameter_callback_handle_ = get_node()->add_on_set_parameters_callback(
@@ -238,6 +235,7 @@ CallbackReturn VisualController::on_configure(
         }
         return result;
     });
+
 
     // Create a subscription for the joint command
     marker_pose_subscriber_ = get_node()->create_subscription<std_msgs::msg::Float64MultiArray>(
@@ -286,6 +284,9 @@ CallbackReturn VisualController::on_activate(
   const rclcpp_lifecycle::State& /*previous_state*/) {
     updateJointStates();
     elapsed_time_ = 0.0;
+    initial_timeout_ = 0.0;
+    marker_lost_time_ = 0.0;
+    marker_tracking_active_ = false;
 
     M_kdl_.resize(NUM_JOINTS);
     G_kdl_.resize(NUM_JOINTS);
@@ -355,7 +356,14 @@ void VisualController::marker_pose_callback(const std::shared_ptr<std_msgs::msg:
             KDL::Frame(KDL::Rotation(xx, xy, xz, yx, yy, yz, zx, zy, zz), KDL::Vector(tx, ty, tz)));
         rt_marker_pose_buffer_.writeFromNonRT(T_cam_marker);
         // Set the flag to true when a marker pose message is received
+
         marker_pose_received_.store(true);
+    }
+    else {
+        // lets follow wave trajectory for atleast 1 second if marker not detected
+        
+        // If we dont see the wave, lets go back to following the wave trajectory
+        marker_pose_received_.store(false);
     }
 }
 

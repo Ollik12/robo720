@@ -21,9 +21,8 @@ To launch the visual servoing controller and pose estimator, run:
 ```bash
 ros2 launch ex5 robot.launch.py
 ```
+Also changing behaviour can be done with the following parameter setting: Enable marker track
 
-Also changing behaviour can be done with the following parameter setting:
-Enable marker track
 ```bash
 ros2 param set --no-daemon /visual_controller use_marker_top_pose true
 ```

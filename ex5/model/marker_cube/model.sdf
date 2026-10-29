@@ -1,0 +1,37 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <model name="marker_cube">
+    <static>true</static>
+
+    <link name="marker_cube">
+
+      <collision name="collision">
+        <geometry>
+          <box>
+            <size>0.1 0.1 0.1</size>
+          </box>
+        </geometry>
+      </collision>
+
+      <visual name="marker_cube_visual">
+        <geometry>
+          <box>
+            <size>0.15 0.15 0.15</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.15 0.15 0.15 1</ambient>
+          <diffuse>0.15 0.15 0.15 1</diffuse>
+        </material>
+      </visual>
+
+    </link>
+
+    <!-- Marker sitting on top of cube -->
+    <include>
+      <uri>model://aruco_marker_0_100mm</uri>
+      <pose>0 0 0.08 0 0 0</pose>
+    </include>
+
+  </model>
+</sdf>
