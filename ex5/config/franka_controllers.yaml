@@ -2,18 +2,25 @@ controller_manager:
   ros__parameters:
     update_rate: 1000 # Hz
 
-    hand_controller:
-      type: position_controllers/GripperActionController
+    gripper_position_controller:
+      type: position_controllers/JointGroupPositionController
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
     visual_controller:
       type: ex5/VisualController
-      
-hand_controller:
+
+gripper_position_controller:
   ros__parameters:
-    joint: fr3_finger_joint1
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    joints:
+      - fr3_finger_joint1
+      - fr3_finger_joint2
 
 visual_controller:
   ros__parameters:

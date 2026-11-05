@@ -74,7 +74,7 @@ controller_interface::return_type VisualController::update(
             // setting the desired pose to be 0.5m above the marker in base frame
             xd_kdl_.p = T_Base_Marker.p;
 
-            // Keep the TCP above the marker until an explicit grasp approach is added.
+            // Lower the TCP slightly so the fingers can reach around the cube.
             xd_kdl_.p.z(xd_kdl_.p.z() + marker_approach_height_);
 
             // NOTE: end effector orientation is rotated by PI compared to the aruco marker

@@ -83,10 +83,10 @@ def generate_launch_description():
         remappings=[("robot_description", "robot_description")]
     )
 
-    hand_controller_spawner = Node(
+    gripper_position_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["hand_controller", "--controller-manager", "/controller_manager"],
+        arguments=["gripper_position_controller", "--controller-manager", "/controller_manager"],
     )
 
     joint_state_broadcaster_spawner = Node(
@@ -107,8 +107,8 @@ def generate_launch_description():
         executable="create",
         output="screen",
         arguments=[
-            "-string",
-            robot_description_xacro,
+            "-topic",
+            "robot_description",
             "-name",
             "fr3_arm",
             "-allow_renaming",
@@ -161,11 +161,26 @@ def generate_launch_description():
     nodes_to_start = [
         set_model_path,
         robot_state_publisher_node,
-        joint_state_broadcaster_spawner,
-        hand_controller_spawner,
-        visual_controller_spawner,
-        gz_spawn_entity,
         gz_launch_description,
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=gz_spawn_entity,
+                on_exit=[joint_state_broadcaster_spawner],
+            )
+        ),
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=joint_state_broadcaster_spawner,
+                on_exit=[gripper_position_controller_spawner],
+            )
+        ),
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=gripper_position_controller_spawner,
+                on_exit=[visual_controller_spawner],
+            )
+        ),
+        gz_spawn_entity,
         rviz_node,
         ros_gz_bridge,
         pose_estimate,

@@ -19,11 +19,18 @@ source install/setup.bash
 To launch the visual servoing controller and pose estimator, run:
 
 ```bash
+source install/setup.bash
 ros2 launch ex5 robot.launch.py
+```
+
+```bash
+source install/setup.bash
+ros2 run goal_publishers goal_pose_publisher.py
 ```
 By default, a received `goal_pose` is followed; if no goal has been received, the controller follows the wave. Enable marker tracking with:
 
 ```bash
+source install/setup.bash
 ros2 param set --no-daemon /visual_controller use_marker_top_pose true
 ```
 In marker mode, the controller follows the wave until the marker is detected. Disable marker mode to return to the goal pose or wave:
@@ -31,13 +38,12 @@ In marker mode, the controller follows the wave until the marker is detected. Di
 ros2 param set --no-daemon /visual_controller use_marker_top_pose false
 ```
 
-The gripper can be operated manually with its action controller. Close and open it with:
+Then open or close the gripper:
 
 ```bash
-ros2 action send_goal /hand_controller/gripper_cmd control_msgs/action/GripperCommand "{command: {position: 0.0, max_effort: 20.0}}"
-ros2 action send_goal /hand_controller/gripper_cmd control_msgs/action/GripperCommand "{command: {position: 0.04, max_effort: 20.0}}"
+source install/setup.bash
+ros2 run ex5 gripper_command.py close
+ros2 run ex5 gripper_command.py open
 ```
-
-Automatic pick-and-place is not implemented yet; it needs a configured placement pose.
 
 So got to pose o, enable use marker pose then we go on top of the marker automatically.

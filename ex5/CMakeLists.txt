@@ -15,6 +15,7 @@ find_package(rclcpp_lifecycle REQUIRED)
 find_package(controller_interface REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(trajectory_msgs REQUIRED)
 find_package(control_msgs REQUIRED)
 find_package(realtime_tools REQUIRED)
@@ -90,6 +91,7 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
   scripts/pose_estimate.py
   scripts/tri_wave.py
+  scripts/gripper_command.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
