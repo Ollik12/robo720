@@ -43,11 +43,19 @@ controller_interface::return_type VisualController::update(
     // Load the markerpose boolean to decide whether to follow the wave trajectory or track the marker pose
     const bool marker_received = marker_pose_received_.load();
 
-    if (!marker_received ) { // to have control of what behaviour done, put "or !use_marker_top_pose_.load()"
-        // Follow the wave trajectory before marker tracking starts.
-        xd_kdl_ = *rt_trajectory_buffer_.readFromRT()->get();
-
-    } else {  // Track the marker when marker pose is received
+    if (!use_marker_top_pose_.load()) {
+        marker_tracking_active_ = false;
+        if (goal_pose_received_.load()) {
+            const auto goal = *rt_goal_pose_buffer_.readFromRT();
+            xd_kdl_.p = KDL::Vector(
+                goal->pose.position.x, goal->pose.position.y, goal->pose.position.z);
+            xd_kdl_.M = KDL::Rotation::Quaternion(
+                goal->pose.orientation.x, goal->pose.orientation.y,
+                goal->pose.orientation.z, goal->pose.orientation.w);
+        } else {
+            xd_kdl_ = x_kdl_;
+        }
+    } else if (marker_received) {
         marker_lost_time_ = 0.0;
         if (initial_timeout_ > 1.0) {
             // Read the marker pose
@@ -66,15 +74,29 @@ controller_interface::return_type VisualController::update(
             // setting the desired pose to be 0.5m above the marker in base frame
             xd_kdl_.p = T_Base_Marker.p;
 
-            // Offset above marker in base frame (0.5m above marker)
-            xd_kdl_.p.z(xd_kdl_.p.z() + 0.3);
+            // Keep the TCP above the marker until an explicit grasp approach is added.
+            xd_kdl_.p.z(xd_kdl_.p.z() + marker_approach_height_);
 
             // NOTE: end effector orientation is rotated by PI compared to the aruco marker
             // so let's rotate the marker orientation by PI around X axis to align with the end effector orientation
             xd_kdl_.M = T_Base_Marker.M * KDL::Rotation::RotX(M_PI);
             marker_tracking_active_ = true;
         }
+    } else if (!marker_tracking_active_) {
+        // Hold the goal or current pose until the first marker detection.
+        if (goal_pose_received_.load()) {
+            const auto goal = *rt_goal_pose_buffer_.readFromRT();
+            xd_kdl_.p = KDL::Vector(
+                goal->pose.position.x, goal->pose.position.y, goal->pose.position.z);
+            xd_kdl_.M = KDL::Rotation::Quaternion(
+                goal->pose.orientation.x, goal->pose.orientation.y,
+                goal->pose.orientation.z, goal->pose.orientation.w);
+        } else {
+            xd_kdl_ = x_kdl_;
+        }
     }
+
+    //TODO: when we are on top of the marker lets add gripping of it.
 
     // Get the error in task space
     xe_kdl_ = KDL::diff(x_kdl_, xd_kdl_);
@@ -106,7 +128,11 @@ controller_interface::return_type VisualController::update(
     // Joint space PD + computed torque
     e_dot_ = q_dot_cmd_ - q_dot_;
     u_ = Kd_.cwiseProduct(e_dot_);
-    tau_ = M_ * u_ + G_ + C_;
+
+    // TODO Tau should be tau_att + tau_rep as we add repulsive control for obstacle avoidance from task  into here aswell!
+    tau_att_ = M_ * u_ + G_ + C_;
+
+    tau_ = tau_att_; // + tau_rep_; // TODO: add repulsive control for obstacle avoidance from task space into here aswell!
 
     // Send torque commands to the hardware command interface
     for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
@@ -134,8 +160,10 @@ CallbackReturn VisualController::on_init() {
 
         p_gains_ = auto_declare<std::vector<double>>("p_gains", p_gains_);
         d_gains_ = auto_declare<std::vector<double>>("d_gains", d_gains_);
+        marker_approach_height_ = auto_declare<double>(
+            "marker_approach_height", marker_approach_height_);
         // Parameter to switch between two modes: follow wave trajectory or track marker pose
-        auto_declare<bool>("use_marker_top_pose", false);
+        use_marker_top_pose_.store(auto_declare<bool>("use_marker_top_pose", false));
 
         for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
             Kd_(i) = d_gains_.at(i);
@@ -247,6 +275,11 @@ CallbackReturn VisualController::on_configure(
         "command", rclcpp::SystemDefaultsQoS(), std::bind(&VisualController::trajectory_callback,
         this, std::placeholders::_1));
 
+    // Subscribe to task-space goals
+    goal_pose_subscriber_ = get_node()->create_subscription<geometry_msgs::msg::PoseStamped>(
+        "goal_pose", rclcpp::SystemDefaultsQoS(), std::bind(&VisualController::goal_pose_callback,
+        this, std::placeholders::_1));
+
     // Transform broadcaster for debugging
     tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(get_node());
 
@@ -295,8 +328,32 @@ CallbackReturn VisualController::on_activate(
     q_kdl_.resize(NUM_JOINTS);
     q_dot_kdl_.resize(NUM_JOINTS);
 
+    for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
+        q_kdl_(i) = position_interface_vals_(i);
+    }
+
     T_cam_marker_ = KDL::Frame::Identity();
     T_base_cam = KDL::Frame::Identity();
+
+    KDL::Frame initial_pose;
+    if (solver_->computeFK(q_kdl_, initial_pose) < 0) {
+        RCLCPP_ERROR(get_node()->get_logger(), "Failed to compute initial end-effector pose.");
+        return CallbackReturn::ERROR;
+    }
+
+    auto initial_goal = std::make_shared<geometry_msgs::msg::PoseStamped>();
+    initial_goal->header.frame_id = root_link_;
+    initial_goal->pose.position.x = initial_pose.p.x();
+    initial_goal->pose.position.y = initial_pose.p.y();
+    initial_goal->pose.position.z = initial_pose.p.z();
+    initial_pose.M.GetQuaternion(
+        initial_goal->pose.orientation.x,
+        initial_goal->pose.orientation.y,
+        initial_goal->pose.orientation.z,
+        initial_goal->pose.orientation.w);
+    xd_kdl_ = initial_pose;
+    goal_pose_received_.store(true);
+    rt_goal_pose_buffer_.writeFromNonRT(initial_goal);
 
     return CallbackReturn::SUCCESS;
 }
@@ -343,9 +400,14 @@ void VisualController::trajectory_callback(const std::shared_ptr<std_msgs::msg::
     rt_trajectory_buffer_.writeFromNonRT(xd);
 }
 
+void VisualController::goal_pose_callback(const std::shared_ptr<geometry_msgs::msg::PoseStamped> msg) {
+    rt_goal_pose_buffer_.writeFromNonRT(msg);
+    goal_pose_received_.store(true);
+}
+
 // Marker pose in camera optical frame
 void VisualController::marker_pose_callback(const std::shared_ptr<std_msgs::msg::Float64MultiArray> msg) {
-    if (msg->data.size() > 0) {
+    if (msg->data.size() >= 12) {
         double xx, xy, xz, yx, yy, yz, zx, zy, zz, tx, ty, tz;
         xx = msg->data[0], xy = msg->data[1];  xz = msg->data[2];
         yx = msg->data[3], yy = msg->data[4];  yz = msg->data[5];
@@ -373,7 +435,7 @@ void VisualController::publish_marker_tf() {
     KDL::Frame f = xd_kdl_;
 
     t.header.stamp = get_node()->get_clock()->now();
-    t.header.frame_id = "fr3_link0";
+    t.header.frame_id = root_link_;
     t.child_frame_id = "goal_pose";
 
     t.transform.translation.x = f.p.x();

@@ -13,6 +13,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <realtime_tools/realtime_buffer.hpp>
 #include <tf2_ros/transform_broadcaster.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 #include <std_msgs/msg/float64_multi_array.hpp>
 
 #include <Eigen/Dense>
@@ -41,10 +42,12 @@ class VisualController : public controller_interface::ControllerInterface {
         // Non-RT (realtime) subscriber
         rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr marker_pose_subscriber_;
         rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr trajectory_subscriber_;
+        rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_pose_subscriber_;
         
         // Buffer for RT update() loop (store a shared_ptr instead of the message itself -> less copying)
         realtime_tools::RealtimeBuffer<std::shared_ptr<KDL::Frame>> rt_marker_pose_buffer_;
         realtime_tools::RealtimeBuffer<std::shared_ptr<KDL::Frame>> rt_trajectory_buffer_;
+        realtime_tools::RealtimeBuffer<std::shared_ptr<geometry_msgs::msg::PoseStamped>> rt_goal_pose_buffer_;
 
         // Marker TF broadcaster for RViz debug
         std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
@@ -84,7 +87,9 @@ class VisualController : public controller_interface::ControllerInterface {
         Vector6d xd_dot_;
         Vector7d e_; // position error
         Vector7d u_;
-        Vector7d tau_; // torque command
+        Vector7d tau_att_; // attractive torque command
+        Vector7d tau_rep_; // repulsive torque command
+        Vector7d tau_; // total torque command
 
         // KDL variables
         KDL::JntSpaceInertiaMatrix M_kdl_;
@@ -102,6 +107,7 @@ class VisualController : public controller_interface::ControllerInterface {
         double elapsed_time_{0.0};
         double initial_timeout_{0.0};
         double marker_lost_time_{0.0};
+        double marker_approach_height_{0.12};
         bool marker_tracking_active_{false};
 
         std::vector<double> p_gains_;
@@ -112,6 +118,7 @@ class VisualController : public controller_interface::ControllerInterface {
         // Subscriber callback 
         void marker_pose_callback(const std::shared_ptr<std_msgs::msg::Float64MultiArray> msg);
         void trajectory_callback(const std::shared_ptr<std_msgs::msg::Float64MultiArray> msg);
+        void goal_pose_callback(const std::shared_ptr<geometry_msgs::msg::PoseStamped> msg);
 
         // Marker TF publisher
         void publish_marker_tf();
@@ -126,6 +133,7 @@ class VisualController : public controller_interface::ControllerInterface {
         // boolean for checking whether we received a marker pose message yet
         // We will use atomic bool to ensure thread safety
         std::atomic_bool marker_pose_received_{false};
+        std::atomic_bool goal_pose_received_{false};
         // also atomic boolean for switching between two modes
         std::atomic_bool use_marker_top_pose_{false};
 };

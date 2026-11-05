@@ -52,6 +52,8 @@ def generate_launch_description():
                  "effort_fr3_arm.urdf.xacro"]
             ),
             " ",
+            "end_effector:=gripper", # End effector set to be forcetorque sensor
+            " ",
             "sim_ignition:=true",
             " ",
             "simulation_controllers:=",
@@ -77,6 +79,12 @@ def generate_launch_description():
         remappings=[("robot_description", "robot_description")]
     )
 
+    hand_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["hand_controller", "--controller-manager", "/controller_manager"],
+    )
+
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
         executable="spawner",
@@ -87,13 +95,6 @@ def generate_launch_description():
         package="controller_manager",
         executable="spawner",
         arguments=["visual_controller", "--controller-manager", "/controller_manager"],
-    )
-
-    # Task-space trajectory publisher
-    trajectory_publisher_node = Node(
-        package="ex5",
-        executable="tri_wave.py",
-        output="both",
     )
 
     # GZ nodes
@@ -157,8 +158,8 @@ def generate_launch_description():
         set_model_path,
         robot_state_publisher_node,
         joint_state_broadcaster_spawner,
+        hand_controller_spawner,
         visual_controller_spawner,
-        trajectory_publisher_node,
         gz_spawn_entity,
         gz_launch_description,
         rviz_node,

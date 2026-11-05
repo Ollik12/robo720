@@ -18,7 +18,7 @@ class Commander(Node):
         # Pose center + orientation (look down)
         self.x  = 0.7
         self.y0 = 0.0
-        self.z  = 0.6
+        self.z  = 1.6
         self.r  = math.pi    # roll
         self.p  = 0.0        # pitch
         self.yw = 0.0        # yaw
