@@ -34,10 +34,10 @@ ros2 param set --no-daemon /visual_controller use_marker_top_pose false
 The gripper can be operated manually with its action controller. Close and open it with:
 
 ```bash
-ros2 action send_goal /hand_controller/gripper_cmd control_msgs/action/GripperCommand "{position: 0.0, max_effort: 20.0}"
-ros2 action send_goal /hand_controller/gripper_cmd control_msgs/action/GripperCommand "{position: 0.04, max_effort: 20.0}"
+ros2 action send_goal /hand_controller/gripper_cmd control_msgs/action/GripperCommand "{command: {position: 0.0, max_effort: 20.0}}"
+ros2 action send_goal /hand_controller/gripper_cmd control_msgs/action/GripperCommand "{command: {position: 0.04, max_effort: 20.0}}"
 ```
 
 Automatic pick-and-place is not implemented yet; it needs a configured placement pose.
 
-So got to pose o, enable use marker pose then we go on top of the marker
+So got to pose o, enable use marker pose then we go on top of the marker automatically.

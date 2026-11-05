@@ -1,22 +1,41 @@
 <?xml version="1.0" ?>
 <sdf version="1.9">
   <model name="marker_cube">
-    <static>true</static>
+    <static>false</static>
 
     <link name="marker_cube">
+      <inertial>
+        <mass>0.1</mass>
+        <inertia>
+          <ixx>6e-5</ixx>
+          <iyy>6e-5</iyy>
+          <izz>6e-5</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
 
       <collision name="collision">
         <geometry>
           <box>
-            <size>0.1 0.1 0.1</size>
+            <size>0.06 0.06 0.06</size>
           </box>
         </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.0</mu>
+              <mu2>1.0</mu2>
+            </ode>
+          </friction>
+        </surface>
       </collision>
 
       <visual name="marker_cube_visual">
         <geometry>
           <box>
-            <size>0.15 0.15 0.15</size>
+            <size>0.06 0.06 0.06</size>
           </box>
         </geometry>
         <material>
@@ -25,13 +44,25 @@
         </material>
       </visual>
 
+      <visual name="aruco_marker_visual">
+        <pose>0 0 0.0301 0 0 0</pose>
+        <geometry>
+          <plane>
+            <normal>0 0 1</normal>
+            <size>0.075 0.075</size>
+          </plane>
+        </geometry>
+        <material>
+          <diffuse>1 1 1 1</diffuse>
+          <specular>0.4 0.4 0.4 1</specular>
+          <pbr>
+            <metal>
+              <albedo_map>model://aruco_marker_0_100mm/materials/textures/aruco_0.png</albedo_map>
+            </metal>
+          </pbr>
+        </material>
+      </visual>
     </link>
-
-    <!-- Marker sitting on top of cube -->
-    <include>
-      <uri>model://aruco_marker_0_100mm</uri>
-      <pose>0 0 0.08 0 0 0</pose>
-    </include>
 
   </model>
 </sdf>

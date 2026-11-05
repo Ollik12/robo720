@@ -63,6 +63,10 @@ def generate_launch_description():
             " ",
             "camera:=true",
             " ",
+            "camera_image_width:=1280",
+            " ",
+            "camera_image_height:=960",
+            " ",
             "initial_positions_file:=",
             initial_positions,
         ]
@@ -150,7 +154,7 @@ def generate_launch_description():
             '-p', 'camera_info_topic:=/camera/camera_info',
             '-p', 'dictionary:=DICT_4X4_50',
             '-p', 'marker_id:=0',
-            '-p', 'marker_length_m:=0.15',
+            '-p', 'marker_length_m:=0.05',
         ],
     )
 
