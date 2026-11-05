@@ -154,7 +154,7 @@ def generate_launch_description():
             '-p', 'camera_info_topic:=/camera/camera_info',
             '-p', 'dictionary:=DICT_4X4_50',
             '-p', 'marker_id:=0',
-            '-p', 'marker_length_m:=0.05',
+            '-p', 'marker_length_m:=0.04',
         ],
     )
 

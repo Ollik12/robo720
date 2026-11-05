@@ -71,10 +71,9 @@ controller_interface::return_type VisualController::update(
             // we can compute the frame from base to marker by multiplying gotten frames
             KDL::Frame T_Base_Marker = T_base_cam * T_cam_marker_;
 
-            // setting the desired pose to be 0.5m above the marker in base frame
-            xd_kdl_.p = T_Base_Marker.p;
-
             // Lower the TCP slightly so the fingers can reach around the cube.
+            xd_kdl_.p = T_Base_Marker.p +
+                T_Base_Marker.M * KDL::Vector(0.0, -0.01, 0.0);
             xd_kdl_.p.z(xd_kdl_.p.z() + marker_approach_height_);
 
             // NOTE: end effector orientation is rotated by PI compared to the aruco marker
