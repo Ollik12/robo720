@@ -3,6 +3,11 @@
   <xacro:arg name="arm_id" default="fr3" /> <!-- Name of this fr3 -->
   <xacro:arg name="end_effector" default="" />
   <xacro:arg name="camera" default="false" />
+  <xacro:arg name="camera_image_width" default="640" />
+  <xacro:arg name="camera_image_height" default="480" />
+  <xacro:arg name="camera_x" default="0.0" />
+  <xacro:arg name="camera_y" default="-0.05" />
+  <xacro:arg name="camera_z" default="0.09" />
   <xacro:arg name="sim_ignition" default="false" />
   <xacro:arg name="use_fake_hardware" default="false" />
   <xacro:arg name="simulation_controllers" default="" />
@@ -56,14 +61,14 @@
   <xacro:include filename="$(find franka_description)/urdf/fr3_arm.xacro" />
   <xacro:fr3_arm arm_id="$(arg arm_id)" sim_ignition="$(arg sim_ignition)" connected_to="base"
     xyz="0 0 1"
-    safety_distance="0.03" />
+    safety_distance="0.0" />
 
   <!-- FR3 gripper -->
   <xacro:if value="${end_effector == 'gripper'}">
     <xacro:include filename="$(find franka_description)/urdf/hand.xacro" />
     <xacro:hand sim_ignition="$(arg sim_ignition)" ns="$(arg arm_id)" rpy="0 0 ${-pi/4}"
       connected_to="$(arg arm_id)_link8"
-      safety_distance="0.03" />
+      safety_distance="0.0" />
   </xacro:if>
 
   <!-- Force torque sensor -->
@@ -77,7 +82,8 @@
   <xacro:if value="$(arg camera)">
     <xacro:include filename="$(find franka_description)/urdf/camera.xacro" />
     <xacro:rgb_camera parent_link="$(arg arm_id)_link7" camera_link_name="$(arg arm_id)_camera_link"
-      camera_optical_link_name="$(arg arm_id)_camera_link_optical" />
+      camera_optical_link_name="$(arg arm_id)_camera_link_optical"
+      xyz="$(arg camera_x) $(arg camera_y) $(arg camera_z)" />
   </xacro:if>
 
   <!-- ROS2 control -->
@@ -95,13 +101,13 @@
   <xacro:if value="$(arg sim_ignition)">
     <!-- Force torque sensor plugin -->
     <xacro:if value="${end_effector == 'ft_sensor'}">
-      <gazebo reference="fr3_sensor_joint">
+      <gazebo reference="$(arg arm_id)_sensor_joint">
         <sensor name="force_torque_sensor" type="force_torque">
           <update_rate>100.0</update_rate>
           <always_on>true</always_on>
-          <topic>ft_sensor/data</topic>
+          <topic>/sensor_joint/force_torque</topic>
           <visualize>true</visualize>
-          <ignition_frame_id>fr3_ft_sensor_link</ignition_frame_id>
+          <ignition_frame_id>$(arg arm_id)_ft_sensor_link</ignition_frame_id>
           <force_torque>
             <frame>child</frame>
             <measure_direction>parent_to_child</measure_direction>
@@ -123,8 +129,8 @@
           <camera>
             <horizontal_fov>1.047</horizontal_fov>
             <image>
-              <width>640</width>
-              <height>480</height>
+              <width>$(arg camera_image_width)</width>
+              <height>$(arg camera_image_height)</height>
               <format>R8G8B8</format>
             </image>
             <clip>

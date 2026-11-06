@@ -42,42 +42,64 @@
           <mesh filename="file://$(find ${description_pkg})/meshes/visual/hand.dae" />
         </geometry>
       </visual>
-      <collision>
-        <origin xyz="0 0 0.04" rpy="0 ${pi/2} ${pi/2}" />
-        <geometry>
-          <cylinder radius="${0.04+safety_distance}" length="0.1" />
-        </geometry>
-      </collision>
-      <collision>
-        <origin xyz="0 -0.05 0.04" rpy="0 0 0" />
-        <geometry>
-          <sphere radius="${0.04+safety_distance}" />
-        </geometry>
-      </collision>
-      <collision>
-        <origin xyz="0 0.05 0.04" rpy="0 0 0" />
-        <geometry>
-          <sphere radius="${0.04+safety_distance}" />
-        </geometry>
-      </collision>
-      <collision>
-        <origin xyz="0 0 0.1" rpy="0 ${pi/2} ${pi/2}" />
-        <geometry>
-          <cylinder radius="${0.02+safety_distance}" length="0.1" />
-        </geometry>
-      </collision>
-      <collision>
-        <origin xyz="0 -0.05 0.1" rpy="0 0 0" />
-        <geometry>
-          <sphere radius="${0.02+safety_distance}" />
-        </geometry>
-      </collision>
-      <collision>
-        <origin xyz="0 0.05 0.1" rpy="0 0 0" />
-        <geometry>
-          <sphere radius="${0.02+safety_distance}" />
-        </geometry>
-      </collision>
+      <xacro:if value="${sim_ignition}">
+        <collision>
+          <origin xyz="0 0 0.04" rpy="0 ${pi/2} ${pi/2}" />
+          <geometry>
+            <cylinder radius="${0.01+safety_distance}" length="0.1" />
+          </geometry>
+        </collision>
+        <collision>
+          <origin xyz="0 -0.05 0.04" rpy="0 0 0" />
+          <geometry>
+            <sphere radius="${0.01+safety_distance}" />
+          </geometry>
+        </collision>
+        <collision>
+          <origin xyz="0 0.05 0.04" rpy="0 0 0" />
+          <geometry>
+            <sphere radius="${0.01+safety_distance}" />
+          </geometry>
+        </collision>
+      </xacro:if>
+      <xacro:unless value="${sim_ignition}">
+        <collision>
+          <origin xyz="0 0 0.04" rpy="0 ${pi/2} ${pi/2}" />
+          <geometry>
+            <cylinder radius="${0.04+safety_distance}" length="0.1" />
+          </geometry>
+        </collision>
+        <collision>
+          <origin xyz="0 -0.05 0.04" rpy="0 0 0" />
+          <geometry>
+            <sphere radius="${0.04+safety_distance}" />
+          </geometry>
+        </collision>
+        <collision>
+          <origin xyz="0 0.05 0.04" rpy="0 0 0" />
+          <geometry>
+            <sphere radius="${0.04+safety_distance}" />
+          </geometry>
+        </collision>
+        <collision>
+          <origin xyz="0 0 0.1" rpy="0 ${pi/2} ${pi/2}" />
+          <geometry>
+            <cylinder radius="${0.02+safety_distance}" length="0.1" />
+          </geometry>
+        </collision>
+        <collision>
+          <origin xyz="0 -0.05 0.1" rpy="0 0 0" />
+          <geometry>
+            <sphere radius="${0.02+safety_distance}" />
+          </geometry>
+        </collision>
+        <collision>
+          <origin xyz="0 0.05 0.1" rpy="0 0 0" />
+          <geometry>
+            <sphere radius="${0.02+safety_distance}" />
+          </geometry>
+        </collision>
+      </xacro:unless>
       <xacro:if value="${sim_ignition}">
         <xacro:inertial_props name="hand" />
       </xacro:if>
@@ -95,6 +117,11 @@
           <mesh filename="file://$(find ${description_pkg})/meshes/visual/finger.dae" />
         </geometry>
       </visual>
+      <collision>
+        <geometry>
+          <mesh filename="file://$(find ${description_pkg})/meshes/visual/finger.dae" />
+        </geometry>
+      </collision>
       <xacro:if value="${sim_ignition}">
         <xacro:inertial_props name="leftfinger" />
       </xacro:if>
@@ -106,6 +133,12 @@
           <mesh filename="file://$(find ${description_pkg})/meshes/visual/finger.dae" />
         </geometry>
       </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 ${pi}" />
+        <geometry>
+          <mesh filename="file://$(find ${description_pkg})/meshes/visual/finger.dae" />
+        </geometry>
+      </collision>
       <xacro:if value="${sim_ignition}">
         <xacro:inertial_props name="rightfinger" />
       </xacro:if>
@@ -123,7 +156,6 @@
       <origin xyz="0 0 0.0584" rpy="0 0 0" />
       <axis xyz="0 -1 0" />
       <limit effort="20" lower="0.0" upper="0.04" velocity="0.2" />
-      <mimic joint="${ns}_finger_joint1" multiplier="1" />
     </joint>
   </xacro:macro>
 </robot>
