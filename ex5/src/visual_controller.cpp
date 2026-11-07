@@ -50,11 +50,10 @@ controller_interface::return_type VisualController::update(
         // Read the marker pose (camera optical frame)
         T_cam_marker_ = *rt_marker_pose_buffer_.readFromRT()->get();
 
-        // Get the current camera pose in base frame
-        // Transformation from base frame to camera optical frame
+        // Camera optical link pose in base frame transformation
         cam_solver_->computeFK(q_kdl_, T_base_cam_);  
 
-        // Transform the marker pose from camera optical frame to base frame
+        // Compute the marker pose in base frame transformation
         T_base_marker_ = T_base_cam_ * T_cam_marker_;
         
         // Set the desired end effector pose to be above the marker with a fixed offset
