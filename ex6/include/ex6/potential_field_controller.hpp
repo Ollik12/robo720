@@ -41,6 +41,12 @@ class PotentialFieldController : public controller_interface::ControllerInterfac
         CallbackReturn on_activate(const rclcpp_lifecycle::State& previous_state) override;
 
     private:
+
+        struct AvoidancePoint {
+            Eigen::Vector3d position;
+            Eigen::Matrix<double, 3, NUM_JOINTS> jacobian;
+        };
+        
         // Non-RT (realtime) subscriber
         rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_pose_subscriber_;
         // Subscriber for obstacle initial positions and shape
@@ -54,6 +60,7 @@ class PotentialFieldController : public controller_interface::ControllerInterfac
 
         // Marker publisher for RViz visualization
         rclcpp_lifecycle::LifecyclePublisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_markers_;
+        rclcpp_lifecycle::LifecyclePublisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_avoidance_markers_;
 
         std::string robot_description_;
         std::vector<std::string> command_interface_types_;
@@ -122,6 +129,7 @@ class PotentialFieldController : public controller_interface::ControllerInterfac
 
         // Publishers
         void publish_markers();
+        void publish_avoidance_markers(const std::vector<AvoidancePoint>& avoidance_points);
 
         // Read joint states from the hardware state interface
         void updateJointStates();
@@ -135,10 +143,8 @@ class PotentialFieldController : public controller_interface::ControllerInterfac
             double upper;
         };
 
-        struct AvoidancePoint {
-            Eigen::Vector3d position;
-            Eigen::Matrix<double, 3, NUM_JOINTS> jacobian;
-        };
+        std::vector<AvoidancePoint> getAvoidancePoints();
+        std::vector<AvoidancePoint> avoidance_points_; // Store avoidance points for joint limits and obstacles
 
         std::array<JointLimits, NUM_JOINTS> joint_limits_;
 

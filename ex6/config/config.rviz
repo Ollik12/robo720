@@ -10,6 +10,7 @@ Panels:
         - /TF1/Frames1
         - /Pose1
         - /RobotModel1
+        - /MarkerArray2
       Splitter Ratio: 0.5
     Tree Height: 872
   - Class: rviz_common/Selection
@@ -210,6 +211,18 @@ Visualization Manager:
       Update Interval: 0
       Value: true
       Visual Enabled: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: MarkerArray
+      Namespaces:
+        avoidance_points: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /avoidance_markers
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -256,25 +269,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 4.840152740478516
+      Distance: 2.4938840866088867
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.15007321536540985
-        Y: -0.20312324166297913
-        Z: 0.39636102318763733
+        X: 0.2591730058193207
+        Y: 0.3715444505214691
+        Z: 0.8781847953796387
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.8103981018066406
+      Pitch: 0.665398120880127
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.9554001688957214
+      Yaw: 0.4904029965400696
     Saved: ~
 Window Geometry:
   Displays:
@@ -292,5 +305,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1080
-  X: 60
+  X: 0
   Y: 236

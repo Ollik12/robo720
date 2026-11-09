@@ -43,7 +43,7 @@ controller_interface::return_type PotentialFieldController::update(
     xd_kdl_ = *rt_goal_pose_buffer_.readFromRT()->get();
 
     /**
-     * TODO: implement attractive force/velocity
+     * Implement attractive force/velocity
      */
 
     // Current pose of the end-effector using forward kinematics
@@ -95,7 +95,7 @@ controller_interface::return_type PotentialFieldController::update(
     tau_attr_ = M_ * u_ + G_ + C_;
      
     /**
-     * TODO: implement joint limits as APF
+     * Joint limits as APF
      */
 
     // Reset repulsive torque to zero before computing contributions from joint limits and obstacles
@@ -134,90 +134,93 @@ controller_interface::return_type PotentialFieldController::update(
     }
 
     /**
-     * TODO: implement obstacle avoidance with APF
+     * Obstacle avoidance with APF
      */
+
+     // Get the avoidance points from helper function
+    std::vector<AvoidancePoint> avoidance_points = getAvoidancePoints();
 
     // Read the obstacle info
     const auto& obstacles = *rt_obstacles_.readFromRT();
-    for (const auto& obs : obstacles) {
-        Eigen::Vector3d p_obs(obs.position.x, obs.position.y, obs.position.z);
 
-        // Jacobian for the end-effector position (first 3 rows of the full Jacobian)
-        Eigen::Matrix<double, 3, NUM_JOINTS> J_p = J_kdl_.data.topRows<3>();
+    // Compute repulsive torque for every joint and obstacles
+    for (const auto& point : avoidance_points) {
 
-        // Spherical obstacle
-        if (obs.shape_type == custom_msgs::msg::Obstacle::SPHERE) {
-            // Sphere radius
-            double obs_r = obs.radius;
-            /**
-             * TODO: spherical object avoidance
-             */
+        // Get the position and Jacobian of the avoidance point in 3D space
+        Eigen::Vector3d p_point = point.position;
+        Eigen::Matrix<double, 3, NUM_JOINTS> J_p = point.jacobian;
 
-            // Vector from obstacle center to end-effector
-            Eigen::Vector3d diff = p_ee_ - p_obs;
+        for (const auto& obs : obstacles) {
+            Eigen::Vector3d p_obs(obs.position.x, obs.position.y, obs.position.z);
 
-            // Closest point on sphere surface
-            p0_ = p_obs + obs_r * diff.normalized();
+            // Spherical obstacle
+            if (obs.shape_type == custom_msgs::msg::Obstacle::SPHERE) {
+                // Sphere radius
+                double obs_r = obs.radius;
 
-            // Vector from closest point to end-effector
-            Eigen::Vector3d surface_diff = p_ee_ - p0_;
+                // Vector from obstacle center to the point
+                Eigen::Vector3d diff = p_point - p_obs;
 
-            // distance to obstacle surface
-            double D_obs = surface_diff.squaredNorm();
+                // Closest point on sphere surface
+                p0_ = p_obs + obs_r * diff.normalized();
 
-            // Gradient of the distance
-            Vector7d gradD = 2.0 * J_p.transpose() * surface_diff;
+                // Vector from closest point to the point
+                Eigen::Vector3d surface_diff = p_point - p0_;
 
-            if (D_obs > 0.0 && D_obs <= Q_star_obs_) {
+                // distance to obstacle surface
+                double D_obs = surface_diff.squaredNorm();
 
-                // Repulsive force
-                Vector7d F_obs = K_rep_ * (1.0 / D_obs - 1.0 / Q_star_obs_) * (1.0 / (D_obs * D_obs)) * gradD;
+                // Gradient of the distance
+                Vector7d gradD = 2.0 * J_p.transpose() * surface_diff;
 
-                F_rep_ += F_obs;
+                if (D_obs > 0.0 && D_obs <= Q_star_obs_) {
+
+                    // Repulsive force
+                    Vector7d F_obs = K_rep_ * (1.0 / D_obs - 1.0 / Q_star_obs_) * (1.0 / (D_obs * D_obs)) * gradD;
+
+                    F_rep_ += F_obs;
+                }
             }
 
-        }
-        // Box obstacle (such as wall)
-        else if (obs.shape_type == custom_msgs::msg::Obstacle::BOX) {
-            // Box dimensions vector
-            Eigen::Vector3d box_size(obs.box_size.at(0), obs.box_size.at(1), obs.box_size.at(2));
-            /**
-             * TODO: box obstacle avoidance
-             */
+            // Box obstacle (such as wall)
+            else if (obs.shape_type == custom_msgs::msg::Obstacle::BOX) {
+                // Box dimensions vector
+                Eigen::Vector3d box_size(obs.box_size.at(0), obs.box_size.at(1), obs.box_size.at(2));
 
-             // End-effector position relative to box center
-            Eigen::Vector3d p_rel = p_ee_ - p_obs;
+                // Point position relative to box center
+                Eigen::Vector3d p_rel = p_point - p_obs;
 
-            // Box half dimensions
-            Eigen::Vector3d half_size = box_size / 2.0;
+                // Box half dimensions
+                Eigen::Vector3d half_size = box_size / 2.0;
 
-            // Closest point on the box (relative to its center)
-            Eigen::Vector3d p0_rel = p_rel.cwiseMax(-half_size).cwiseMin(half_size);
+                // Closest point on the box (relative to its center)
+                Eigen::Vector3d p0_rel = p_rel.cwiseMax(-half_size).cwiseMin(half_size);
 
-            // Closest point in world coordinates
-            Eigen::Vector3d p0 = p_obs + p0_rel;
+                // Closest point in world coordinates
+                Eigen::Vector3d p0 = p_obs + p0_rel;
 
-            // Vector from closest point to end-effector
-            Eigen::Vector3d diff = p_ee_ - p0;
+                // Vector from closest point to the point
+                Eigen::Vector3d diff = p_point - p0;
 
-            // Squared distance to box
-            double D_obs = diff.squaredNorm();
+                // Squared distance to box
+                double D_obs = diff.squaredNorm();
 
-            // Gradient of the distance
-            Vector7d gradD = 2.0 * J_p.transpose() * diff;      
+                // Gradient of the distance
+                Vector7d gradD = 2.0 * J_p.transpose() * diff;      
 
-            if (D_obs > 0.0 && D_obs <= Q_star_obs_) {
+                if (D_obs > 0.0 && D_obs <= Q_star_obs_) {
 
-                // Repulsive force
-                Vector7d F_obs = K_rep_ * (1.0 / D_obs - 1.0 / Q_star_obs_) * (1.0 / (D_obs * D_obs)) * gradD;
+                    // Repulsive force
+                    Vector7d F_obs = K_rep_ * (1.0 / D_obs - 1.0 / Q_star_obs_) * (1.0 / (D_obs * D_obs)) * gradD;
 
-                F_rep_ += F_obs;
+                    F_rep_ += F_obs;
+                }
             }
         }
     }
 
     /**
-     * TODO: final torque command
+     *  Final torque command
      */
     tau_rep_ = F_rep_ - B_rep_ * q_dot_;
     tau_ = tau_attr_ + tau_rep_;
@@ -228,8 +231,41 @@ controller_interface::return_type PotentialFieldController::update(
     }
 
     publish_markers();
+    publish_avoidance_markers(avoidance_points);
 
     return controller_interface::return_type::OK;
+}
+
+std::vector<PotentialFieldController::AvoidancePoint> PotentialFieldController::getAvoidancePoints() {
+    std::vector<AvoidancePoint> avoidance_points;
+    
+    for (unsigned int i = 0; i < chain_.getNrOfSegments(); ++i) {
+
+        KDL::Frame frame;
+        KDL::Jacobian jacobian(NUM_JOINTS);
+
+        // KDL segment number is 1-based
+        unsigned int segment_nr = i + 1;
+
+        solver_->computeFK(q_kdl_, frame, segment_nr);
+        solver_->compute_jac(q_kdl_, jacobian, segment_nr);
+
+        AvoidancePoint point;
+
+        // Store the position of the segment in 3D space
+        point.position = Eigen::Vector3d(
+            frame.p.x(),
+            frame.p.y(),
+            frame.p.z()
+        );
+
+        // Store the first three rows of the Jacobian (linear velocity part)
+        point.jacobian = jacobian.data.topRows<3>();
+
+        avoidance_points.push_back(point);
+    }
+
+    return avoidance_points;
 }
 
 CallbackReturn PotentialFieldController::on_init() {
@@ -350,6 +386,7 @@ CallbackReturn PotentialFieldController::on_configure(
 
     // Publisher
     pub_markers_ = get_node()->create_publisher<visualization_msgs::msg::MarkerArray>("markers", 1000);
+    pub_avoidance_markers_ = get_node()->create_publisher<visualization_msgs::msg::MarkerArray>("avoidance_markers", 1000);
 
     RCLCPP_INFO(get_node()->get_logger(), "Robot configuration done.");
     return CallbackReturn::SUCCESS;
@@ -399,8 +436,9 @@ CallbackReturn PotentialFieldController::on_activate(
     xd->M = KDL::Rotation::EulerZYX(0.0, 0.0, M_PI);
     rt_goal_pose_buffer_.writeFromNonRT(xd);
 
-    // Activate publisher
+    // Activate publishers
     pub_markers_->on_activate();
+    pub_avoidance_markers_->on_activate();
 
     return CallbackReturn::SUCCESS;
 }
@@ -537,6 +575,47 @@ void PotentialFieldController::kdl_chain_error_print() {
     for (it = segment_map.begin(); it != segment_map.end(); it++) {
         RCLCPP_ERROR(get_node()->get_logger(), "    %s", std::string((*it).first).c_str());
     }
+}
+
+void PotentialFieldController::publish_avoidance_markers(
+    const std::vector<AvoidancePoint>& avoidance_points)
+{
+    visualization_msgs::msg::MarkerArray marker_array;
+
+    for (size_t i = 0; i < avoidance_points.size(); ++i) {
+        visualization_msgs::msg::Marker marker;
+
+        marker.header.frame_id = "base";  // KDL base frame
+        marker.header.stamp = get_node()->get_clock()->now();
+
+        marker.ns = "avoidance_points";
+        marker.id = static_cast<int>(i);
+        marker.type = visualization_msgs::msg::Marker::SPHERE;
+        marker.action = visualization_msgs::msg::Marker::ADD;
+
+        // Position
+        marker.pose.position.x = avoidance_points[i].position.x();
+        marker.pose.position.y = avoidance_points[i].position.y();
+        marker.pose.position.z = avoidance_points[i].position.z();
+        marker.pose.orientation.w = 1.0;
+
+        // Scale (size of the sphere) to represent the avoidance radius
+        double avoidance_radius = std::sqrt(Q_star_obs_);
+        
+        marker.scale.x = 2.0 * avoidance_radius;
+        marker.scale.y = 2.0 * avoidance_radius;
+        marker.scale.z = 2.0 * avoidance_radius;
+
+        // Green color
+        marker.color.r = 0.0;
+        marker.color.g = 1.0;
+        marker.color.b = 0.0;
+        marker.color.a = 0.1;
+
+        marker_array.markers.push_back(marker);
+    }
+
+    pub_avoidance_markers_->publish(marker_array);
 }
 
 void PotentialFieldController::kdl_chain_success_print() {
