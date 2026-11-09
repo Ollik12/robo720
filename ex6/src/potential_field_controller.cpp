@@ -46,19 +46,104 @@ controller_interface::return_type PotentialFieldController::update(
      * TODO: implement attractive force/velocity
      */
 
-    
+    // Current pose of the end-effector using forward kinematics
+    int fk_ok = solver_->computeFK(q_kdl_, x_kdl_);
+
+    // Error handling for forward kinematics computation
+    if (fk_ok < 0) {
+        RCLCPP_ERROR(get_node()->get_logger(), "Forward kinematics computation failed");
+        return controller_interface::return_type::ERROR;
+    } 
+
+    // Current end-effector position in 3D space
+    // Store the current end-effector position in p_ee
+    // Used for obstacle avoidance calculations
+    p_ee_(0) = x_kdl_.p.x();
+    p_ee_(1) = x_kdl_.p.y();
+    p_ee_(2) = x_kdl_.p.z();
+
+    // Compute the postion error between the current pose and the desired pose
+    xe_kdl_ = KDL::diff(x_kdl_, xd_kdl_);
+
+    // Get dynamics parameters and Jacobian
+    solver_->compute_dyn_params(q_kdl_, q_dot_kdl_, M_kdl_, G_kdl_, C_kdl_);
+    solver_->compute_jac(q_kdl_, J_kdl_);
+
+    // Copy data to Eigen variables for matrix computations
+    M_ = M_kdl_.data;
+    G_ = G_kdl_.data;
+    C_ = C_kdl_.data;
+    J_ = J_kdl_.data;
+    q_ = q_kdl_.data;
+    q_dot_ = q_dot_kdl_.data;
+
+    xe_(0) = xe_kdl_.vel.x(); xe_(1) = xe_kdl_.vel.y(); xe_(2) = xe_kdl_.vel.z();
+    xe_(3) = xe_kdl_.rot.x(); xe_(4) = xe_kdl_.rot.y(); xe_(5) = xe_kdl_.rot.z();
+
+    // Jacobian pseudo-inverse
+    solver_->get_damped_pseudo_inverse(J_, J_pinv_);
+
+    // Desired end effector velocity
+    xd_dot_ = Kp_.cwiseProduct(xe_);
+
+    // Joint velocity command
+    q_dot_cmd_ = J_pinv_ * xd_dot_;
+
+    // Joint space PD + computed torque to produce attractive torque
+    e_dot_ = q_dot_cmd_ - q_dot_;
+    u_ = Kd_.cwiseProduct(e_dot_);
+    tau_attr_ = M_ * u_ + G_ + C_;
+     
     /**
      * TODO: implement joint limits as APF
      */
 
+    // Reset repulsive torque to zero before computing contributions from joint limits and obstacles
+    tau_rep_.setZero();
+
+    // Compute repulsive torque for joint limits
+    for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
+        // Get the current joint position and limits
+        const double q = q_(i);
+        const double lower = joint_limits_[i].lower;
+        const double upper = joint_limits_[i].upper;
+
+        const double d1 = q - lower;
+        const double d2 = q - upper;
+
+        // Avoid division by zero by ensuring distances are not too small
+        const double D1 = std::max(D_min, d1 * d1);
+        const double D2 = std::max(D_min, d2 * d2);
+
+        // Initialize repulsive forces for lower and upper limits
+        double F_lower = 0.0;
+        double F_upper = 0.0;
+
+        // Lower limit repulsive force
+        if (d1 > 0.0 && D1 <= Q_star_joint_) {
+            F_lower = K_rep_ * (1.0 / D1 - 1.0 / Q_star_joint_) * (2.0 * d1 / (D1 * D1));
+        }
+
+        // Upper limit repulsive force
+        if (d2 > 0.0 && D2 <= Q_star_joint_) {
+            F_upper = K_rep_ * (1.0 / D2 - 1.0 / Q_star_joint_) * (2.0 * d2 / (D2 * D2));
+        }
+
+        // Compute the repulsive force
+        F_rep_(i) = F_lower + F_upper;
+    }
 
     /**
      * TODO: implement obstacle avoidance with APF
      */
+
     // Read the obstacle info
     const auto& obstacles = *rt_obstacles_.readFromRT();
     for (const auto& obs : obstacles) {
         Eigen::Vector3d p_obs(obs.position.x, obs.position.y, obs.position.z);
+
+        // Jacobian for the end-effector position (first 3 rows of the full Jacobian)
+        Eigen::Matrix<double, 3, NUM_JOINTS> J_p = J_kdl_.data.topRows<3>();
 
         // Spherical obstacle
         if (obs.shape_type == custom_msgs::msg::Obstacle::SPHERE) {
@@ -67,6 +152,30 @@ controller_interface::return_type PotentialFieldController::update(
             /**
              * TODO: spherical object avoidance
              */
+
+            // Vector from obstacle center to end-effector
+            Eigen::Vector3d diff = p_ee_ - p_obs;
+
+            // Closest point on sphere surface
+            p0_ = p_obs + obs_r * diff.normalized();
+
+            // Vector from closest point to end-effector
+            Eigen::Vector3d surface_diff = p_ee_ - p0_;
+
+            // distance to obstacle surface
+            double D_obs = surface_diff.squaredNorm();
+
+            // Gradient of the distance
+            Vector7d gradD = 2.0 * J_p.transpose() * surface_diff;
+
+            if (D_obs > 0.0 && D_obs <= Q_star_obs_) {
+
+                // Repulsive force
+                Vector7d F_obs = K_rep_ * (1.0 / D_obs - 1.0 / Q_star_obs_) * (1.0 / (D_obs * D_obs)) * gradD;
+
+                F_rep_ += F_obs;
+            }
+
         }
         // Box obstacle (such as wall)
         else if (obs.shape_type == custom_msgs::msg::Obstacle::BOX) {
@@ -75,16 +184,47 @@ controller_interface::return_type PotentialFieldController::update(
             /**
              * TODO: box obstacle avoidance
              */
+
+             // End-effector position relative to box center
+            Eigen::Vector3d p_rel = p_ee_ - p_obs;
+
+            // Box half dimensions
+            Eigen::Vector3d half_size = box_size / 2.0;
+
+            // Closest point on the box (relative to its center)
+            Eigen::Vector3d p0_rel = p_rel.cwiseMax(-half_size).cwiseMin(half_size);
+
+            // Closest point in world coordinates
+            Eigen::Vector3d p0 = p_obs + p0_rel;
+
+            // Vector from closest point to end-effector
+            Eigen::Vector3d diff = p_ee_ - p0;
+
+            // Squared distance to box
+            double D_obs = diff.squaredNorm();
+
+            // Gradient of the distance
+            Vector7d gradD = 2.0 * J_p.transpose() * diff;      
+
+            if (D_obs > 0.0 && D_obs <= Q_star_obs_) {
+
+                // Repulsive force
+                Vector7d F_obs = K_rep_ * (1.0 / D_obs - 1.0 / Q_star_obs_) * (1.0 / (D_obs * D_obs)) * gradD;
+
+                F_rep_ += F_obs;
+            }
         }
     }
 
     /**
      * TODO: final torque command
      */
+    tau_rep_ = F_rep_ - B_rep_ * q_dot_;
+    tau_ = tau_attr_ + tau_rep_;
 
     // Send torque commands to the hardware command interface
     for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
-        command_interfaces_[i].set_value(0.0);
+        command_interfaces_[i].set_value(tau_(i));
     }
 
     publish_markers();
@@ -103,12 +243,23 @@ CallbackReturn PotentialFieldController::on_init() {
 
         root_link_ = auto_declare<std::string>("root_link", root_link_);
         tip_link_ = auto_declare<std::string>("tip_link", tip_link_);
+
+        // Read the joint gains from the parameters
+        p_gains_ = auto_declare<std::vector<double>>("p_gains", p_gains_);
+        d_gains_ = auto_declare<std::vector<double>>("d_gains", d_gains_);
+        for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
+            Kd_(i) = d_gains_.at(i);
+        }
+        for (std::size_t i = 0; i < NUM_TASK; ++i) {
+            Kp_(i) = p_gains_.at(i);
+        }
     } 
+
     catch (const std::exception& e) {
         fprintf(stderr, "Exception thrown during init stage (on_init) with message: %s \n", e.what());
         return CallbackReturn::ERROR;
     }
-
+    
     RCLCPP_INFO(get_node()->get_logger(), "Robot initialization done.");
     return CallbackReturn::SUCCESS;
 }
@@ -154,6 +305,12 @@ CallbackReturn PotentialFieldController::on_configure(
         /**
          * TODO: read the joint limits to some data structure
          */
+        
+        // Read the joint limits from the URDF and store them into array
+        joint_limits_[i] = {
+            joint_urdf->limits->lower,
+            joint_urdf->limits->upper
+        };
     }
 
     // Construct a KDL tree object from the URDF
@@ -231,6 +388,10 @@ CallbackReturn PotentialFieldController::on_activate(
 
     q_kdl_.resize(NUM_JOINTS);
     q_dot_kdl_.resize(NUM_JOINTS);
+    M_kdl_.resize(NUM_JOINTS);
+    G_kdl_.resize(NUM_JOINTS);
+    C_kdl_.resize(NUM_JOINTS);
+    J_kdl_.resize(NUM_JOINTS);
 
     // Initialize realtime buffer
     auto xd = std::make_shared<KDL::Frame>();

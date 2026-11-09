@@ -26,3 +26,18 @@ potential_field_controller:
       - velocity
     root_link: "base"
     tip_link: "fr3_link8"
+    p_gains:  
+      - 1.4
+      - 1.4
+      - 1.4
+      - 1.4
+      - 1.4
+      - 1.4
+    d_gains:
+      - 10.0
+      - 10.0
+      - 10.0
+      - 10.0
+      - 10.0
+      - 10.0
+      - 10.0 

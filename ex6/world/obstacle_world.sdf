@@ -340,5 +340,33 @@
       </link>
     </model>
 
+    <model name="obstacle_box1">
+      <pose>0 1.0 1 0 0 0</pose>
+      <static>true</static>
+      <link name="obstacle_box1_link">
+        <visual name="link_visual">
+          <pose>0 0 0 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.3 0.5 0.2</size>
+            </box>
+          </geometry>
+          <material>
+            <diffuse>0.5 0.5 0.5 1</diffuse>
+            <specular>0.5 0.5 0.5 1</specular>
+            <ambient>0.5 0.5 0.5 1</ambient>
+          </material>
+        </visual>
+        <collision name="link_collision">
+          <pose>0 0 0 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.3 0.5 0.2</size>
+            </box>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
   </world>
 </sdf>

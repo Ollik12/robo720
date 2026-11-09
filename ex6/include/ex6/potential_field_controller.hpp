@@ -74,12 +74,47 @@ class PotentialFieldController : public controller_interface::ControllerInterfac
         std::unique_ptr<Solver> solver_;
 
         // KDL variables
+        KDL::JntSpaceInertiaMatrix M_kdl_;
+        KDL::JntArray G_kdl_;
+        KDL::JntArray C_kdl_;
+        KDL::Jacobian J_kdl_;
         KDL::JntArray q_kdl_;
         KDL::JntArray q_dot_kdl_;
+        KDL::Frame x_kdl_;
         KDL::Frame xd_kdl_;
+        KDL::Twist xe_kdl_;
+
+        // Eigen variables
+        Eigen::Matrix<double, NUM_JOINTS, NUM_JOINTS> M_;
+        Vector7d G_;
+        Vector7d C_;
+        Eigen::Matrix<double, NUM_TASK, NUM_JOINTS> J_;
+        Eigen::Matrix<double, NUM_JOINTS, NUM_TASK> J_pinv_;
+        std::vector<double> p_gains_;
+        std::vector<double> d_gains_;
+        Vector6d Kp_;
+        Vector7d Kd_;
+        Vector7d tau_attr_; // attractive torque
+        Vector7d tau_rep_; // repulsive torque
+        Vector7d F_rep_; // repulsive force
+        Vector7d q_;
+        Vector7d q_dot_;
+        Vector7d q_dot_cmd_; // command velocity
+        Vector7d e_dot_;
+        Vector6d xe_;
+        Vector6d xd_dot_;
+        Vector7d e_; // position error
+        Vector7d u_;
+        Vector7d tau_; // final torque command
+        Eigen::Vector3d p_ee_; // End effector as point in 3D space
+        Eigen::Vector3d p0_; // Closest point to obstacle in 3D space
 
         double elapsed_time_{0.0};
-
+        double Q_star_joint_{0.1}; // threshold distance for repulsive potential field
+        double Q_star_obs_{0.0225}; // threshold distance for repulsive potential field
+        double K_rep_{0.1}; // repulsive gain for joint limits
+        double B_rep_{1.0}; // repulsive damping coefficient
+        double D_min{1e-4}; // minimum distance to joint limit for repulsive force (avoid division by zero)
         // Subscriber callbacks
         void goal_pose_callback(const std::shared_ptr<geometry_msgs::msg::PoseStamped> msg);
         void init_obstacle_callback(const custom_msgs::msg::ObstacleArray msg);
@@ -94,6 +129,19 @@ class PotentialFieldController : public controller_interface::ControllerInterfac
         // Debug print functions to reduce clutter in the controller code
         void kdl_chain_error_print();
         void kdl_chain_success_print();
+
+        struct JointLimits {
+            double lower;
+            double upper;
+        };
+
+        struct AvoidancePoint {
+            Eigen::Vector3d position;
+            Eigen::Matrix<double, 3, NUM_JOINTS> jacobian;
+        };
+
+        std::array<JointLimits, NUM_JOINTS> joint_limits_;
+
 };
 
 }  // namespace ex6
