@@ -11,6 +11,7 @@
 #include <controller_interface/controller_interface.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <std_msgs/msg/float64_multi_array.hpp>
 #include <custom_msgs/msg/obstacle_array.hpp>
 #include <tf2_msgs/msg/tf_message.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
@@ -46,7 +47,7 @@ class PotentialFieldController : public controller_interface::ControllerInterfac
             Eigen::Vector3d position;
             Eigen::Matrix<double, 3, NUM_JOINTS> jacobian;
         };
-        
+
         // Non-RT (realtime) subscriber
         rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_pose_subscriber_;
         // Subscriber for obstacle initial positions and shape
@@ -61,6 +62,13 @@ class PotentialFieldController : public controller_interface::ControllerInterfac
         // Marker publisher for RViz visualization
         rclcpp_lifecycle::LifecyclePublisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_markers_;
         rclcpp_lifecycle::LifecyclePublisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_avoidance_markers_;
+
+        // Publishers for joint limits
+        rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64MultiArray>::SharedPtr pub_lower_limits_;
+        rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64MultiArray>::SharedPtr pub_upper_limits_;
+
+        // Timer for publishing joint limits at a fixed rate
+        rclcpp::TimerBase::SharedPtr joint_limits_timer_;
 
         std::string robot_description_;
         std::vector<std::string> command_interface_types_;
@@ -118,9 +126,9 @@ class PotentialFieldController : public controller_interface::ControllerInterfac
 
         double elapsed_time_{0.0};
         double Q_star_joint_{0.1}; // threshold distance for repulsive potential field
-        double Q_star_obs_{0.0225}; // threshold distance for repulsive potential field
-        double K_rep_{0.1}; // repulsive gain for joint limits
-        double B_rep_{1.0}; // repulsive damping coefficient
+        double Q_star_obs_{0.03}; // threshold distance for repulsive potential field
+        double K_rep_{0.001}; // repulsive gain
+        double B_rep_{5.0}; // repulsive damping coefficient
         double D_min{1e-4}; // minimum distance to joint limit for repulsive force (avoid division by zero)
         // Subscriber callbacks
         void goal_pose_callback(const std::shared_ptr<geometry_msgs::msg::PoseStamped> msg);
@@ -130,6 +138,7 @@ class PotentialFieldController : public controller_interface::ControllerInterfac
         // Publishers
         void publish_markers();
         void publish_avoidance_markers(const std::vector<AvoidancePoint>& avoidance_points);
+        void publish_joint_limits();
 
         // Read joint states from the hardware state interface
         void updateJointStates();

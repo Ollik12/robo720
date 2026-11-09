@@ -121,6 +121,13 @@ def generate_launch_description():
         output="screen",
     )
 
+     # PlotJuggler node
+    plotjuggler_node = Node(
+        package="plotjuggler",
+        executable="plotjuggler",
+        output="screen",
+    )
+
     nodes_to_start = [
         robot_state_publisher_node,
         joint_state_broadcaster_spawner,
@@ -130,6 +137,7 @@ def generate_launch_description():
         rviz_node,
         pose_bridge,
         scene_bridge,
+        plotjuggler_node,
         SetEnvironmentVariable('IGN_GAZEBO_VERBOSE', '1'),
     ]
 

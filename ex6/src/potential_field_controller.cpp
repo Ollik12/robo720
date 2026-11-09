@@ -55,13 +55,6 @@ controller_interface::return_type PotentialFieldController::update(
         return controller_interface::return_type::ERROR;
     } 
 
-    // Current end-effector position in 3D space
-    // Store the current end-effector position in p_ee
-    // Used for obstacle avoidance calculations
-    p_ee_(0) = x_kdl_.p.x();
-    p_ee_(1) = x_kdl_.p.y();
-    p_ee_(2) = x_kdl_.p.z();
-
     // Compute the postion error between the current pose and the desired pose
     xe_kdl_ = KDL::diff(x_kdl_, xd_kdl_);
 
@@ -338,10 +331,7 @@ CallbackReturn PotentialFieldController::on_configure(
             RCLCPP_ERROR(get_node()->get_logger(), "Could not find joint '%s' in urdf", joint_names_[i].c_str());
             return CallbackReturn::ERROR;
         }
-        /**
-         * TODO: read the joint limits to some data structure
-         */
-        
+
         // Read the joint limits from the URDF and store them into array
         joint_limits_[i] = {
             joint_urdf->limits->lower,
@@ -387,6 +377,22 @@ CallbackReturn PotentialFieldController::on_configure(
     // Publisher
     pub_markers_ = get_node()->create_publisher<visualization_msgs::msg::MarkerArray>("markers", 1000);
     pub_avoidance_markers_ = get_node()->create_publisher<visualization_msgs::msg::MarkerArray>("avoidance_markers", 1000);
+
+    pub_lower_limits_ =
+        get_node()->create_publisher<std_msgs::msg::Float64MultiArray>(
+            "joint_limits/lower", 10);
+
+    pub_upper_limits_ =
+        get_node()->create_publisher<std_msgs::msg::Float64MultiArray>(
+            "joint_limits/upper", 10);
+
+    // Start a timer to publish joint limits at a fixed rate (every 100 ms)
+    joint_limits_timer_ = get_node()->create_wall_timer(
+        std::chrono::milliseconds(100),
+        [this]() {
+            publish_joint_limits();
+        }
+    );
 
     RCLCPP_INFO(get_node()->get_logger(), "Robot configuration done.");
     return CallbackReturn::SUCCESS;
@@ -439,6 +445,8 @@ CallbackReturn PotentialFieldController::on_activate(
     // Activate publishers
     pub_markers_->on_activate();
     pub_avoidance_markers_->on_activate();
+    pub_lower_limits_->on_activate();
+    pub_upper_limits_->on_activate();
 
     return CallbackReturn::SUCCESS;
 }
@@ -616,6 +624,20 @@ void PotentialFieldController::publish_avoidance_markers(
     }
 
     pub_avoidance_markers_->publish(marker_array);
+}
+
+void PotentialFieldController::publish_joint_limits()
+{
+    std_msgs::msg::Float64MultiArray lower_msg;
+    std_msgs::msg::Float64MultiArray upper_msg;
+
+    for (const auto& limit : joint_limits_) {
+        lower_msg.data.push_back(limit.lower);
+        upper_msg.data.push_back(limit.upper);
+    }
+
+    pub_lower_limits_->publish(lower_msg);
+    pub_upper_limits_->publish(upper_msg);
 }
 
 void PotentialFieldController::kdl_chain_success_print() {
