@@ -104,6 +104,13 @@ controller_interface::return_type PotentialFieldController::update(
         const double d1 = q - lower;
         const double d2 = q - upper;
 
+        // Gradients of squared distances
+        const double grad_lower = 2.0 * d1;
+        const double grad_upper = 2.0 * d2;
+
+        const bool moving_towards_lower = 2.0 * grad_lower * q_dot_(i) < 0.0;
+        const bool moving_towards_upper = 2.0 * grad_upper * q_dot_(i) < 0.0;
+
         // Avoid division by zero by ensuring distances are not too small
         const double D1 = std::max(D_min, d1 * d1);
         const double D2 = std::max(D_min, d2 * d2);
@@ -113,17 +120,17 @@ controller_interface::return_type PotentialFieldController::update(
         double F_upper = 0.0;
 
         // Lower limit repulsive force
-        if (d1 > 0.0 && D1 <= Q_star_joint_) {
-            F_lower = K_rep_ * (1.0 / D1 - 1.0 / Q_star_joint_) * (2.0 * d1 / (D1 * D1));
+        if (D1 <= Q_star_joint_ && moving_towards_lower) {
+            F_lower = K_rep_joint_ * (1.0 / D1 - 1.0 / Q_star_joint_) * (2.0 * d1 / (D1 * D1));
         }
 
         // Upper limit repulsive force
-        if (d2 > 0.0 && D2 <= Q_star_joint_) {
-            F_upper = K_rep_ * (1.0 / D2 - 1.0 / Q_star_joint_) * (2.0 * d2 / (D2 * D2));
+        if (D2 <= Q_star_joint_ && moving_towards_upper) {
+            F_upper = K_rep_joint_ * (1.0 / D2 - 1.0 / Q_star_joint_) * (2.0 * d2 / (D2 * D2));
         }
 
-        // Compute the repulsive force
-        F_rep_(i) = F_lower + F_upper;
+        // Compute the repulsive force and store it in the repulsive torque vector
+        tau_rep_(i) = F_lower + F_upper - B_rep_ * q_dot_(i);
     }
 
     /**
@@ -161,17 +168,17 @@ controller_interface::return_type PotentialFieldController::update(
                 Eigen::Vector3d surface_diff = p_point - p0_;
 
                 // distance to obstacle surface
-                double D_obs = surface_diff.squaredNorm();
+                double D_obs = surface_diff.dot(surface_diff);
 
-                // Gradient of the distance
+                // Gradient
                 Vector7d gradD = 2.0 * J_p.transpose() * surface_diff;
 
-                if (D_obs > 0.0 && D_obs <= Q_star_obs_) {
+                if (D_obs < Q_star_obs_) {
 
-                    // Repulsive force
-                    Vector7d F_obs = K_rep_ * (1.0 / D_obs - 1.0 / Q_star_obs_) * (1.0 / (D_obs * D_obs)) * gradD;
+                    // Repulsive torque
+                    Vector7d tau_obs = K_rep_obs_ * (1.0 / D_obs - 1.0 / Q_star_obs_) * (1.0 / (D_obs * D_obs)) * gradD;
 
-                    F_rep_ += F_obs;
+                    tau_rep_ += tau_obs;
                 }
             }
 
@@ -196,17 +203,17 @@ controller_interface::return_type PotentialFieldController::update(
                 Eigen::Vector3d diff = p_point - p0;
 
                 // Squared distance to box
-                double D_obs = diff.squaredNorm();
+                double D_obs = diff.dot(diff);
 
-                // Gradient of the distance
+                // Gradient
                 Vector7d gradD = 2.0 * J_p.transpose() * diff;      
 
-                if (D_obs > 0.0 && D_obs <= Q_star_obs_) {
+                if (D_obs < Q_star_obs_) {
 
-                    // Repulsive force
-                    Vector7d F_obs = K_rep_ * (1.0 / D_obs - 1.0 / Q_star_obs_) * (1.0 / (D_obs * D_obs)) * gradD;
+                    // Repulsive torque
+                    Vector7d tau_obs = K_rep_obs_ * (1.0 / D_obs - 1.0 / Q_star_obs_) * (1.0 / (D_obs * D_obs)) * gradD;
 
-                    F_rep_ += F_obs;
+                    tau_rep_ += tau_obs;
                 }
             }
         }
@@ -215,7 +222,6 @@ controller_interface::return_type PotentialFieldController::update(
     /**
      *  Final torque command
      */
-    tau_rep_ = F_rep_ - B_rep_ * q_dot_;
     tau_ = tau_attr_ + tau_rep_;
 
     // Send torque commands to the hardware command interface
@@ -232,7 +238,7 @@ controller_interface::return_type PotentialFieldController::update(
 std::vector<PotentialFieldController::AvoidancePoint> PotentialFieldController::getAvoidancePoints() {
     std::vector<AvoidancePoint> avoidance_points;
     
-    for (unsigned int i = 0; i < chain_.getNrOfSegments(); ++i) {
+    for (unsigned int i = 1; i < chain_.getNrOfSegments(); ++i) {
 
         KDL::Frame frame;
         KDL::Jacobian jacobian(NUM_JOINTS);
@@ -252,7 +258,7 @@ std::vector<PotentialFieldController::AvoidancePoint> PotentialFieldController::
             frame.p.z()
         );
 
-        // Store the first three rows of the Jacobian (linear velocity part)
+        // Store the first three rows of the Jacobian
         point.jacobian = jacobian.data.topRows<3>();
 
         avoidance_points.push_back(point);
@@ -607,18 +613,18 @@ void PotentialFieldController::publish_avoidance_markers(
         marker.pose.position.z = avoidance_points[i].position.z();
         marker.pose.orientation.w = 1.0;
 
-        // Scale (size of the sphere) to represent the avoidance radius
+        // Scale (size of the sphere) to visualize the avoidance radius
         double avoidance_radius = std::sqrt(Q_star_obs_);
         
         marker.scale.x = 2.0 * avoidance_radius;
         marker.scale.y = 2.0 * avoidance_radius;
         marker.scale.z = 2.0 * avoidance_radius;
 
-        // Green color
+        // Blue color
         marker.color.r = 0.0;
-        marker.color.g = 1.0;
-        marker.color.b = 0.0;
-        marker.color.a = 0.1;
+        marker.color.g = 0.3;
+        marker.color.b = 1.0;
+        marker.color.a = 0.2;
 
         marker_array.markers.push_back(marker);
     }

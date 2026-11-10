@@ -111,24 +111,22 @@ class PotentialFieldController : public controller_interface::ControllerInterfac
         Vector7d Kd_;
         Vector7d tau_attr_; // attractive torque
         Vector7d tau_rep_; // repulsive torque
-        Vector7d F_rep_; // repulsive force
         Vector7d q_;
         Vector7d q_dot_;
         Vector7d q_dot_cmd_; // command velocity
         Vector7d e_dot_;
         Vector6d xe_;
         Vector6d xd_dot_;
-        Vector7d e_; // position error
         Vector7d u_;
         Vector7d tau_; // final torque command
-        Eigen::Vector3d p_ee_; // End effector as point in 3D space
         Eigen::Vector3d p0_; // Closest point to obstacle in 3D space
 
         double elapsed_time_{0.0};
         double Q_star_joint_{0.1}; // threshold distance for repulsive potential field
-        double Q_star_obs_{0.03}; // threshold distance for repulsive potential field
-        double K_rep_{0.001}; // repulsive gain
-        double B_rep_{5.0}; // repulsive damping coefficient
+        double Q_star_obs_{0.08}; // threshold distance for repulsive potential field
+        double K_rep_joint_{0.01}; // repulsive gain for joints
+        double K_rep_obs_{0.0005}; // repulsive gain for obstacles
+        double B_rep_{0.1}; // repulsive damping coefficient
         double D_min{1e-4}; // minimum distance to joint limit for repulsive force (avoid division by zero)
         // Subscriber callbacks
         void goal_pose_callback(const std::shared_ptr<geometry_msgs::msg::PoseStamped> msg);
@@ -156,7 +154,6 @@ class PotentialFieldController : public controller_interface::ControllerInterfac
         std::vector<AvoidancePoint> avoidance_points_; // Store avoidance points for joint limits and obstacles
 
         std::array<JointLimits, NUM_JOINTS> joint_limits_;
-
 };
 
 }  // namespace ex6

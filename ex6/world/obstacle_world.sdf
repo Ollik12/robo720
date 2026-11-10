@@ -285,7 +285,7 @@
     </model>
     
     <model name="obstacle_s1">
-      <pose>0.7 0 1.5 0 0 0</pose>
+      <pose>0.28 0.32 1.5 0 0 0</pose>
       <static>true</static>
       <link name="obstacle_s1_link">
         <visual name="link_visual">
@@ -341,14 +341,14 @@
     </model>
 
     <model name="obstacle_box1">
-      <pose>0 1.0 1 0 0 0</pose>
+      <pose>0.75 0.01 1.45 0 0 0</pose>
       <static>true</static>
       <link name="obstacle_box1_link">
         <visual name="link_visual">
           <pose>0 0 0 0 0 0</pose>
           <geometry>
             <box>
-              <size>0.3 0.5 0.2</size>
+              <size>0.15 0.15 0.15</size>
             </box>
           </geometry>
           <material>
@@ -361,7 +361,7 @@
           <pose>0 0 0 0 0 0</pose>
           <geometry>
             <box>
-              <size>0.3 0.5 0.2</size>
+              <size>0.1 0.1 0.1</size>
             </box>
           </geometry>
         </collision>
