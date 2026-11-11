@@ -285,7 +285,7 @@
     </model>
     
     <model name="obstacle_s1">
-      <pose>0.28 0.32 1.5 0 0 0</pose>
+      <pose>0.28 0.39 1.48 0 0 0</pose>
       <static>true</static>
       <link name="obstacle_s1_link">
         <visual name="link_visual">

@@ -104,12 +104,12 @@ controller_interface::return_type PotentialFieldController::update(
         const double d1 = q - lower;
         const double d2 = q - upper;
 
-        // Gradients of squared distances
+        // Gradients
         const double grad_lower = 2.0 * d1;
         const double grad_upper = 2.0 * d2;
 
-        const bool moving_towards_lower = 2.0 * grad_lower * q_dot_(i) < 0.0;
-        const bool moving_towards_upper = 2.0 * grad_upper * q_dot_(i) < 0.0;
+        const bool moving_towards_lower = grad_lower * q_dot_(i) < 0.0;
+        const bool moving_towards_upper = grad_upper * q_dot_(i) < 0.0;
 
         // Avoid division by zero by ensuring distances are not too small
         const double D1 = std::max(D_min, d1 * d1);
@@ -121,12 +121,12 @@ controller_interface::return_type PotentialFieldController::update(
 
         // Lower limit repulsive force
         if (D1 <= Q_star_joint_ && moving_towards_lower) {
-            F_lower = K_rep_joint_ * (1.0 / D1 - 1.0 / Q_star_joint_) * (2.0 * d1 / (D1 * D1));
+            F_lower = K_rep_joint_ * (1.0 / D1 - 1.0 / Q_star_joint_) * (1.0 / (D1 * D1)) * grad_lower;
         }
 
         // Upper limit repulsive force
         if (D2 <= Q_star_joint_ && moving_towards_upper) {
-            F_upper = K_rep_joint_ * (1.0 / D2 - 1.0 / Q_star_joint_) * (2.0 * d2 / (D2 * D2));
+            F_upper = K_rep_joint_ * (1.0 / D2 - 1.0 / Q_star_joint_) * (1.0 / (D2 * D2)) * grad_upper;
         }
 
         // Compute the repulsive force and store it in the repulsive torque vector
@@ -158,16 +158,16 @@ controller_interface::return_type PotentialFieldController::update(
                 // Sphere radius
                 double obs_r = obs.radius;
 
-                // Vector from obstacle center to the point
+                // Vector from obstacle center to the avoidance point
                 Eigen::Vector3d diff = p_point - p_obs;
 
-                // Closest point on sphere surface
-                p0_ = p_obs + obs_r * diff.normalized();
+                // Closest point on sphere surface in world coordinates
+                Eigen::Vector3d p0 = p_obs + obs_r * diff.normalized();
 
-                // Vector from closest point to the point
-                Eigen::Vector3d surface_diff = p_point - p0_;
+                // Vector from closest point to the avoidance point
+                Eigen::Vector3d surface_diff = p_point - p0;
 
-                // distance to obstacle surface
+                // Squared distance to obstacle surface
                 double D_obs = surface_diff.dot(surface_diff);
 
                 // Gradient
@@ -187,19 +187,29 @@ controller_interface::return_type PotentialFieldController::update(
                 // Box dimensions vector
                 Eigen::Vector3d box_size(obs.box_size.at(0), obs.box_size.at(1), obs.box_size.at(2));
 
-                // Point position relative to box center
+                // Avoidance point position relative to box center
                 Eigen::Vector3d p_rel = p_point - p_obs;
 
                 // Box half dimensions
                 Eigen::Vector3d half_size = box_size / 2.0;
 
-                // Closest point on the box (relative to its center)
-                Eigen::Vector3d p0_rel = p_rel.cwiseMax(-half_size).cwiseMin(half_size);
+                Eigen::Vector3d p0_rel = p_rel;
+                
+                // Clamp the point on the box surface
+                // (from the Flexible Box Library)
+                for (int i = 0; i < 3; ++i) {
+                    if (p_rel(i) < -half_size(i)) {
+                        p0_rel(i) = -half_size(i);
+                    }
+                    else if (p_rel(i) > half_size(i)) {
+                        p0_rel(i) = half_size(i);
+                    }
+                }
 
-                // Closest point in world coordinates
+                // Closest point on obstacle in world coordinates
                 Eigen::Vector3d p0 = p_obs + p0_rel;
 
-                // Vector from closest point to the point
+                // Vector from closest point on the box to the avoidance point
                 Eigen::Vector3d diff = p_point - p0;
 
                 // Squared distance to box

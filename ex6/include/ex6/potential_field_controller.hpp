@@ -119,13 +119,12 @@ class PotentialFieldController : public controller_interface::ControllerInterfac
         Vector6d xd_dot_;
         Vector7d u_;
         Vector7d tau_; // final torque command
-        Eigen::Vector3d p0_; // Closest point to obstacle in 3D space
 
         double elapsed_time_{0.0};
-        double Q_star_joint_{0.1}; // threshold distance for repulsive potential field
-        double Q_star_obs_{0.08}; // threshold distance for repulsive potential field
+        double Q_star_joint_{0.01}; // (rad²) joint threshold
+        double Q_star_obs_{0.0625}; // (m²) obstacle threshold
         double K_rep_joint_{0.01}; // repulsive gain for joints
-        double K_rep_obs_{0.0005}; // repulsive gain for obstacles
+        double K_rep_obs_{0.001}; // repulsive gain for obstacles
         double B_rep_{0.1}; // repulsive damping coefficient
         double D_min{1e-4}; // minimum distance to joint limit for repulsive force (avoid division by zero)
         // Subscriber callbacks
