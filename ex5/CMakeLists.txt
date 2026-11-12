@@ -15,6 +15,9 @@ find_package(rclcpp_lifecycle REQUIRED)
 find_package(controller_interface REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(tf2_msgs REQUIRED)
+find_package(custom_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(trajectory_msgs REQUIRED)
 find_package(control_msgs REQUIRED)
@@ -52,6 +55,9 @@ ament_target_dependencies(${PROJECT_NAME}
   rclcpp
   rclcpp_lifecycle
   tf2_ros
+  tf2_msgs
+  custom_msgs
+  visualization_msgs
   realtime_tools
   urdf
   std_msgs

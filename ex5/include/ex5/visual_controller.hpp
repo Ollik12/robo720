@@ -7,6 +7,7 @@
 #include <atomic>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <controller_interface/controller_interface.hpp>
@@ -15,6 +16,9 @@
 #include <tf2_ros/transform_broadcaster.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <std_msgs/msg/float64_multi_array.hpp>
+#include <tf2_msgs/msg/tf_message.hpp>
+#include <custom_msgs/msg/obstacle_array.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 #include <Eigen/Dense>
 #include <kdl/frames.hpp>
@@ -43,14 +47,19 @@ class VisualController : public controller_interface::ControllerInterface {
         rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr marker_pose_subscriber_;
         rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr trajectory_subscriber_;
         rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_pose_subscriber_;
+        rclcpp::Subscription<custom_msgs::msg::ObstacleArray>::SharedPtr init_obstacle_subscriber_;
+        rclcpp::Subscription<tf2_msgs::msg::TFMessage>::SharedPtr obstacle_pose_subscriber_;
         
         // Buffer for RT update() loop (store a shared_ptr instead of the message itself -> less copying)
         realtime_tools::RealtimeBuffer<std::shared_ptr<KDL::Frame>> rt_marker_pose_buffer_;
         realtime_tools::RealtimeBuffer<std::shared_ptr<KDL::Frame>> rt_trajectory_buffer_;
         realtime_tools::RealtimeBuffer<std::shared_ptr<geometry_msgs::msg::PoseStamped>> rt_goal_pose_buffer_;
+        realtime_tools::RealtimeBuffer<std::vector<custom_msgs::msg::Obstacle>> rt_obstacles_;
 
         // Marker TF broadcaster for RViz debug
         std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+        rclcpp_lifecycle::LifecyclePublisher<visualization_msgs::msg::MarkerArray>::SharedPtr
+            pub_markers_;
 
         std::string robot_description_;
         std::vector<std::string> command_interface_types_;
@@ -58,6 +67,7 @@ class VisualController : public controller_interface::ControllerInterface {
 
         Vector7d position_interface_vals_;
         Vector7d velocity_interface_vals_;
+        std::unordered_map<std::string, custom_msgs::msg::Obstacle> obstacle_map_;
 
         std::vector<std::string> joint_names_;
         std::string root_link_;
@@ -73,7 +83,7 @@ class VisualController : public controller_interface::ControllerInterface {
         rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr
         parameter_callback_handle_;
 
-        // Eigen variables
+        // Task-space controller variables
         Eigen::Matrix<double, NUM_JOINTS, NUM_JOINTS> M_;
         Vector7d G_;
         Vector7d C_;
@@ -81,11 +91,10 @@ class VisualController : public controller_interface::ControllerInterface {
         Eigen::Matrix<double, NUM_JOINTS, NUM_TASK> J_pinv_;
         Vector7d q_;
         Vector7d q_dot_;
-        Vector7d q_dot_cmd_; // command velocity
+        Vector7d q_dot_cmd_;
         Vector7d e_dot_;
         Vector6d xe_;
         Vector6d xd_dot_;
-        Vector7d e_; // position error
         Vector7d u_;
         Vector7d tau_att_; // attractive torque command
         Vector7d tau_rep_; // repulsive torque command
@@ -119,6 +128,8 @@ class VisualController : public controller_interface::ControllerInterface {
         void marker_pose_callback(const std::shared_ptr<std_msgs::msg::Float64MultiArray> msg);
         void trajectory_callback(const std::shared_ptr<std_msgs::msg::Float64MultiArray> msg);
         void goal_pose_callback(const std::shared_ptr<geometry_msgs::msg::PoseStamped> msg);
+        void init_obstacle_callback(const custom_msgs::msg::ObstacleArray msg);
+        void obstacle_pose_callback(const tf2_msgs::msg::TFMessage& msg);
 
         // Marker TF publisher
         void publish_marker_tf();
@@ -130,12 +141,22 @@ class VisualController : public controller_interface::ControllerInterface {
         void kdl_chain_error_print(const std::string& tip_link);
         void kdl_chain_success_print(const std::string& tip_link, const KDL::Chain& chain);
 
+        // publisher for rviz markers: 
+        void publish_markers(const std::vector<custom_msgs::msg::Obstacle>& obstacles);
         // boolean for checking whether we received a marker pose message yet
         // We will use atomic bool to ensure thread safety
         std::atomic_bool marker_pose_received_{false};
         std::atomic_bool goal_pose_received_{false};
         // also atomic boolean for switching between two modes
         std::atomic_bool use_marker_top_pose_{false};
+        // Vectors for joint limits
+        Vector7d lower_joint_limits_;
+        Vector7d upper_joint_limits_;
+
+        // value for distance tresh and gain for (2)
+        double k_rep = 0.1;
+        double B_rep = 5.0;
+        double Q_star= 0.04;
 };
 
 }  // namespace ex5

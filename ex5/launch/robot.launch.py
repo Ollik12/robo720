@@ -86,19 +86,31 @@ def generate_launch_description():
     gripper_position_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["gripper_position_controller", "--controller-manager", "/controller_manager"],
+        arguments=[
+            "gripper_position_controller",
+            "--controller-manager", "/controller_manager",
+            "--switch-timeout", "300.0",
+        ],
     )
 
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager"],
+        arguments=[
+            "joint_state_broadcaster",
+            "--controller-manager", "/controller_manager",
+            "--switch-timeout", "300.0",
+        ],
     )
 
     visual_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["visual_controller", "--controller-manager", "/controller_manager"],
+        arguments=[
+            "visual_controller",
+            "--controller-manager", "/controller_manager",
+            "--switch-timeout", "300.0",
+        ],
     )
 
     # GZ nodes
@@ -143,6 +155,23 @@ def generate_launch_description():
         ],
     )
 
+    obstacle_pose_bridge = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        name="obstacle_pose_bridge",
+        arguments=[
+            "/world/cam_scene/pose/info@tf2_msgs/msg/TFMessage@ignition.msgs.Pose_V",
+        ],
+        output="screen",
+    )
+
+    scene_bridge = Node(
+        package="ros_ign_scene_bridge",
+        executable="scene_bridge",
+        parameters=[{"world_name": "cam_scene"}],
+        output="screen",
+    )
+
      # Aruco marker pose estimation node
     pose_estimate = Node(
         package='ex5',
@@ -165,24 +194,23 @@ def generate_launch_description():
         RegisterEventHandler(
             OnProcessExit(
                 target_action=gz_spawn_entity,
-                on_exit=[joint_state_broadcaster_spawner],
+                on_exit=[
+                    joint_state_broadcaster_spawner,
+                    gripper_position_controller_spawner,
+                    visual_controller_spawner,
+                ],
             )
         ),
         RegisterEventHandler(
             OnProcessExit(
                 target_action=joint_state_broadcaster_spawner,
-                on_exit=[gripper_position_controller_spawner],
-            )
-        ),
-        RegisterEventHandler(
-            OnProcessExit(
-                target_action=gripper_position_controller_spawner,
-                on_exit=[visual_controller_spawner],
+                on_exit=[rviz_node],
             )
         ),
         gz_spawn_entity,
-        rviz_node,
         ros_gz_bridge,
+        obstacle_pose_bridge,
+        scene_bridge,
         pose_estimate,
         SetEnvironmentVariable('IGN_GAZEBO_VERBOSE', '1'),
     ]

@@ -2,6 +2,7 @@
 #include "franka_kdl/robot_constants.hpp"
 #include "franka_kdl/solver.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <exception>
 #include <functional>
@@ -28,6 +29,7 @@ controller_interface::return_type VisualController::update(
   const rclcpp::Duration& period) {
     // Update joint states from hardware state interface
     updateJointStates();
+    const auto& obstacles = *rt_obstacles_.readFromRT();
 
     const double dt = period.seconds();
     elapsed_time_ = elapsed_time_ + dt;
@@ -95,16 +97,13 @@ controller_interface::return_type VisualController::update(
         }
     }
 
-    //TODO: when we are on top of the marker lets add gripping of it.
+    // Gripping is done via terminal
 
-    // Get the error in task space
     xe_kdl_ = KDL::diff(x_kdl_, xd_kdl_);
 
-    // Get dynamics parameters and Jacobian
     solver_->compute_dyn_params(q_kdl_, q_dot_kdl_, M_kdl_, G_kdl_, C_kdl_);
     solver_->compute_jac(q_kdl_, J_kdl_);
 
-    // Copy data to Eigen variables for matrix computations
     M_ = M_kdl_.data;
     G_ = G_kdl_.data;
     C_ = C_kdl_.data;
@@ -115,29 +114,106 @@ controller_interface::return_type VisualController::update(
     xe_(0) = xe_kdl_.vel.x(); xe_(1) = xe_kdl_.vel.y(); xe_(2) = xe_kdl_.vel.z();
     xe_(3) = xe_kdl_.rot.x(); xe_(4) = xe_kdl_.rot.y(); xe_(5) = xe_kdl_.rot.z();
 
-    // Jacobian pseudo-inverse
     solver_->get_damped_pseudo_inverse(J_, J_pinv_);
-
-    // Desired end effector velocity
     xd_dot_ = Kp_.cwiseProduct(xe_);
-
-    // Joint velocity command
     q_dot_cmd_ = J_pinv_ * xd_dot_;
-
-    // Joint space PD + computed torque
     e_dot_ = q_dot_cmd_ - q_dot_;
     u_ = Kd_.cwiseProduct(e_dot_);
-
-    // TODO Tau should be tau_att + tau_rep as we add repulsive control for obstacle avoidance from task  into here aswell!
     tau_att_ = M_ * u_ + G_ + C_;
 
-    tau_ = tau_att_; // + tau_rep_; // TODO: add repulsive control for obstacle avoidance from task space into here aswell!
+    // Joint limits as artificial potential field
+    // We need two repulsive functions as functions of 
+    // D1(q) = (q − am)^2 and D2(q) = (q − aM)^2
+    for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
+        // check wheter we are moving toward lower or upper in joint limits
+        double D1, D2, F1, F2;
+        double gradD1 = 2.0 * (position_interface_vals_(i) - lower_joint_limits_(i));
+        double gradD2 = 2.0 * (position_interface_vals_(i) - upper_joint_limits_(i));
+        bool moving_to_lower = gradD1 * velocity_interface_vals_(i) < 0.0;
+        bool moving_to_upper = gradD2 * velocity_interface_vals_(i) < 0.0;
+        // lets calculate the forcefield for joint 1 for ex.
+        // F,1m = k*((1)/(q1-am)^2-(1)/(Q_star))*(((1)/(q1-am)^2)^2)*[2(q1-am)]
+        // F,1M = k*((1)/(q1-aM)^2-(1)/(Q_star))*(((1)/(q1-aM)^2)^2)*[2(q1-aM)]
+        // F_total = SUM(F,1m + F,1M)
+        D1 = (position_interface_vals_(i) - lower_joint_limits_(i)) * (position_interface_vals_(i) - lower_joint_limits_(i));
+        D2 = (position_interface_vals_(i) - upper_joint_limits_(i)) * (position_interface_vals_(i) - upper_joint_limits_(i));
+        // guard against division by zero
+        if (D1 < 1e-6) {
+            D1 = 1e-6;
+        }
+        if (D2 < 1e-6) {
+            D2 = 1e-6;
+        }
+        // then we can calculate
+        if (D1 <= Q_star && moving_to_lower) {
+            F1 = k_rep * ((1.0 / D1) - (1.0 / Q_star)) * (1.0 / (D1 * D1)) * (gradD1);
+        }
+        else {
+            F1 = 0.0;
+        }
+        if (D2 <= Q_star && moving_to_upper) {
+            F2 = k_rep * ((1.0 / D2) - (1.0 / Q_star)) * (1.0 / (D2 * D2)) * (gradD2);
+        }
+        else {
+            F2 = 0.0;
+        }
+        // then we can sum the forces and add damping term for total repulsive torque
+        tau_rep_(i) = F1 + F2 - B_rep * velocity_interface_vals_(i);
+
+    }
+    for (const auto& obs : obstacles) {
+        if (obs.name != "obstacle_w1" && obs.name != "obstacle_w2") {
+            // only take the walls
+            continue;
+        }
+
+        Eigen::Vector3d p_obs(obs.position.x, obs.position.y, obs.position.z);
+
+        if (obs.shape_type == custom_msgs::msg::Obstacle::BOX) {
+            Eigen::Vector3d box_size(
+                obs.box_size.at(0), obs.box_size.at(1), obs.box_size.at(2));
+              for (int segm_nr = 1;
+                  segm_nr <= static_cast<int>(chain_.getNrOfSegments()); ++segm_nr) {
+                KDL::Frame ee_frame;
+                solver_->computeFK(q_kdl_, ee_frame, segm_nr);
+                Eigen::Vector3d p(
+                    ee_frame.p.x(), ee_frame.p.y(), ee_frame.p.z());
+                Eigen::Vector3d p_local = p - p_obs;
+                Eigen::Vector3d half_size = box_size / 2.0;
+                Eigen::Vector3d nearest;
+                for (int i = 0; i < 3; ++i) {
+                    nearest(i) = std::clamp(p_local(i), -half_size(i), half_size(i));
+                }
+                Eigen::Vector3d nearest_world = nearest + p_obs;
+
+                Eigen::Vector3d diff = p - nearest_world;
+                double D = diff.dot(diff);
+                if (D < 1e-6) {
+                    D = 1e-6;
+                }
+
+                KDL::Jacobian jac(NUM_JOINTS);
+                solver_->compute_jac(q_kdl_, jac, segm_nr);
+                Eigen::Matrix<double, 3, 7> Jp = jac.data.topRows<3>();
+                Vector7d gradD = 2.0 * Jp.transpose() * diff;
+
+                if (D < Q_star) {
+                    Vector7d F_obs = k_rep * (1.0 / D - 1.0 / Q_star) *
+                        (1.0 / (D * D)) * gradD;
+                    tau_rep_ += F_obs;
+                }
+            }
+        }
+    }
+
+    tau_ = tau_att_ + tau_rep_; // TODO: add repulsive control for obstacle avoidance from task space into here aswell!
 
     // Send torque commands to the hardware command interface
     for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
         command_interfaces_[i].set_value(tau_(i));
     }
-
+    // publish for RViz visualization
+    publish_markers(obstacles);
     publish_marker_tf();
 
     return controller_interface::return_type::OK;
@@ -211,6 +287,18 @@ CallbackReturn VisualController::on_configure(
         RCLCPP_INFO(get_node()->get_logger(), "Found robot_description");
     }
 
+    // Get the joint angle limits from the URDF
+    for (std::size_t i = 0; i < NUM_JOINTS; i++) {
+        urdf::JointConstSharedPtr joint_urdf = urdf.getJoint(joint_names_[i]);
+        if (!joint_urdf) {
+            RCLCPP_ERROR(get_node()->get_logger(), "Could not find joint '%s' in urdf", joint_names_[i].c_str());
+            return CallbackReturn::ERROR;
+        }
+        // joint limits in datastructure from urdf file
+        lower_joint_limits_(i) = joint_urdf->limits->lower;
+        upper_joint_limits_(i) = joint_urdf->limits->upper;
+    }
+
     // Construct a KDL tree object from the URDF
     if (!kdl_parser::treeFromUrdfModel(urdf, tree_)) {
         RCLCPP_ERROR(get_node()->get_logger(), "Failed to construct a KDL tree.");
@@ -279,8 +367,18 @@ CallbackReturn VisualController::on_configure(
         "goal_pose", rclcpp::SystemDefaultsQoS(), std::bind(&VisualController::goal_pose_callback,
         this, std::placeholders::_1));
 
+    init_obstacle_subscriber_ = get_node()->create_subscription<custom_msgs::msg::ObstacleArray>(
+        "obstacles", rclcpp::QoS(1).transient_local(),
+        std::bind(&VisualController::init_obstacle_callback, this, std::placeholders::_1));
+
+    obstacle_pose_subscriber_ = get_node()->create_subscription<tf2_msgs::msg::TFMessage>(
+        "world/cam_scene/pose/info", rclcpp::SystemDefaultsQoS(),
+        std::bind(&VisualController::obstacle_pose_callback, this, std::placeholders::_1));
+
     // Transform broadcaster for debugging
     tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(get_node());
+    pub_markers_ = get_node()->create_publisher<visualization_msgs::msg::MarkerArray>(
+        "markers", 1000);
 
     RCLCPP_INFO(get_node()->get_logger(), "Robot configuration done.");
     return CallbackReturn::SUCCESS;
@@ -334,25 +432,24 @@ CallbackReturn VisualController::on_activate(
     T_cam_marker_ = KDL::Frame::Identity();
     T_base_cam = KDL::Frame::Identity();
 
-    KDL::Frame initial_pose;
-    if (solver_->computeFK(q_kdl_, initial_pose) < 0) {
-        RCLCPP_ERROR(get_node()->get_logger(), "Failed to compute initial end-effector pose.");
-        return CallbackReturn::ERROR;
-    }
+    const KDL::Frame initial_goal_pose(
+        KDL::Rotation::RPY(M_PI, 0.0, 0.0),
+        KDL::Vector(0.7, 0.0, 1.5));
 
     auto initial_goal = std::make_shared<geometry_msgs::msg::PoseStamped>();
     initial_goal->header.frame_id = root_link_;
-    initial_goal->pose.position.x = initial_pose.p.x();
-    initial_goal->pose.position.y = initial_pose.p.y();
-    initial_goal->pose.position.z = initial_pose.p.z();
-    initial_pose.M.GetQuaternion(
+    initial_goal->pose.position.x = initial_goal_pose.p.x();
+    initial_goal->pose.position.y = initial_goal_pose.p.y();
+    initial_goal->pose.position.z = initial_goal_pose.p.z();
+    initial_goal_pose.M.GetQuaternion(
         initial_goal->pose.orientation.x,
         initial_goal->pose.orientation.y,
         initial_goal->pose.orientation.z,
         initial_goal->pose.orientation.w);
-    xd_kdl_ = initial_pose;
+    xd_kdl_ = initial_goal_pose;
     goal_pose_received_.store(true);
     rt_goal_pose_buffer_.writeFromNonRT(initial_goal);
+    pub_markers_->on_activate();
 
     return CallbackReturn::SUCCESS;
 }
@@ -404,6 +501,40 @@ void VisualController::goal_pose_callback(const std::shared_ptr<geometry_msgs::m
     goal_pose_received_.store(true);
 }
 
+void VisualController::init_obstacle_callback(const custom_msgs::msg::ObstacleArray msg) {
+    obstacle_map_.clear();
+    std::vector<custom_msgs::msg::Obstacle> obstacles;
+    obstacles.reserve(msg.obstacles.size());
+    for (const auto& obstacle : msg.obstacles) {
+        obstacle_map_.emplace(obstacle.name, obstacle);
+        obstacles.push_back(obstacle);
+    }
+
+    rt_obstacles_.writeFromNonRT(obstacles);
+}
+
+void VisualController::obstacle_pose_callback(const tf2_msgs::msg::TFMessage& msg) {
+    for (const auto& transform : msg.transforms) {
+        const auto obstacle = obstacle_map_.find(transform.child_frame_id);
+        if (obstacle == obstacle_map_.end()) {
+            continue;
+        }
+
+        obstacle->second.position.x = transform.transform.translation.x;
+        obstacle->second.position.y = transform.transform.translation.y;
+        obstacle->second.position.z = transform.transform.translation.z;
+        obstacle->second.orientation = transform.transform.rotation;
+    }
+
+    std::vector<custom_msgs::msg::Obstacle> obstacles;
+    obstacles.reserve(obstacle_map_.size());
+    for (const auto& [name, obstacle] : obstacle_map_) {
+        obstacles.push_back(obstacle);
+    }
+
+    rt_obstacles_.writeFromNonRT(obstacles);
+}
+
 // Marker pose in camera optical frame
 void VisualController::marker_pose_callback(const std::shared_ptr<std_msgs::msg::Float64MultiArray> msg) {
     if (msg->data.size() >= 12) {
@@ -449,6 +580,46 @@ void VisualController::publish_marker_tf() {
     t.transform.rotation.w = qw;
 
     tf_broadcaster_->sendTransform(t);
+}
+
+void VisualController::publish_markers(
+    const std::vector<custom_msgs::msg::Obstacle>& obstacles) {
+    visualization_msgs::msg::MarkerArray markers;
+
+    int id = 0;
+    for (const auto& obstacle : obstacles) {
+        visualization_msgs::msg::Marker marker;
+        marker.header.frame_id = "world";
+        marker.header.stamp = get_node()->get_clock()->now();
+        marker.ns = "environment";
+        marker.id = id++;
+        marker.action = visualization_msgs::msg::Marker::ADD;
+        marker.pose.position = obstacle.position;
+        marker.pose.orientation = obstacle.orientation;
+        marker.color.r = 0.5f;
+        marker.color.g = 0.5f;
+        marker.color.b = 0.5f;
+        marker.color.a = 1.0f;
+        marker.lifetime = rclcpp::Duration::from_nanoseconds(0);
+
+        if (obstacle.shape_type == custom_msgs::msg::Obstacle::SPHERE) {
+            marker.type = visualization_msgs::msg::Marker::SPHERE;
+            marker.scale.x = 2.0 * obstacle.radius;
+            marker.scale.y = 2.0 * obstacle.radius;
+            marker.scale.z = 2.0 * obstacle.radius;
+        } else if (obstacle.shape_type == custom_msgs::msg::Obstacle::BOX) {
+            marker.type = visualization_msgs::msg::Marker::CUBE;
+            marker.scale.x = obstacle.box_size.at(0);
+            marker.scale.y = obstacle.box_size.at(1);
+            marker.scale.z = obstacle.box_size.at(2);
+        } else {
+            continue;
+        }
+
+        markers.markers.push_back(marker);
+    }
+
+    pub_markers_->publish(markers);
 }
 
 // Debug print functions to reduce clutter in controller code

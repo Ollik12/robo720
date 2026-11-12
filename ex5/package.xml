@@ -14,6 +14,9 @@
   <depend>controller_interface</depend>
   <depend>sensor_msgs</depend>
   <depend>geometry_msgs</depend>
+  <depend>tf2_msgs</depend>
+  <depend>custom_msgs</depend>
+  <depend>visualization_msgs</depend>
   <depend>trajectory_msgs</depend>
   <depend>control_msgs</depend>
   <depend>std_msgs</depend>
@@ -37,6 +40,8 @@
 
   <depend>franka_description</depend>
   <depend>franka_kdl</depend>
+  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>ros_ign_scene_bridge</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
