@@ -26,6 +26,11 @@ def generate_launch_description():
         [FindPackageShare("ex7"), "config", "config.rviz"]
     )
 
+    # lets copy above format for the PlotJuggler config.
+    PlotJuggler_config = PathJoinSubstitution(
+        [FindPackageShare("ex7"), "config", "ex7_PLconfig.xml"]
+    )
+
     # Find the robot description file
     robot_description_xacro = Command(
         [
@@ -111,6 +116,8 @@ def generate_launch_description():
         executable="plotjuggler",
         output="screen",
         arguments=[
+            "-l", # -l used in plotjuggler load
+            PlotJuggler_config
         ]
     )
 

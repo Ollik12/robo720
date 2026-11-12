@@ -46,25 +46,70 @@ controller_interface::return_type DirectForceController::update(
     xd_kdl_ = *rt_goal_pose_buffer_.readFromRT()->get();
 
     if (use_force_measurement_.load()) {
+        // When the ros2 parameter is set
         h_e_ = *rt_force_torque_.readFromRT()->get();
 
         // Low-pass filter force measurement
         h_e_ = h_e_old_ + 0.8 * (h_e_ - h_e_old_);
         h_e_old_ = h_e_;
 
-        /**
-         * TODO: Rotate sensor measurement from sensor frame to base frame
-         */
+        // Rotate wrench from sensor frame to base frame
+        Eigen::Matrix3d R;
+        for (int r = 0; r < 3; ++r) {
+            for (int c = 0; c < 3; ++c) {
+                R(r, c) = x_kdl_.M(r, c);
+            }
+        }
+        // Apply the rotation
+        h_e_.head<3>() = R * h_e_.head<3>();
+        h_e_.tail<3>() = R * h_e_.tail<3>();
 
-        /**
-         * TODO: Compute force controlled desired frame T_f.
-         * hint: integrate the error between measured and desired force with equation 14.
-         * Don't forget about the selection matrix S.
-         * Then compute the error in task space.
-         */
+        // Desired wrench in z-direction
+        Vector6d h_d = Vector6d::Zero();
+        h_d(2) = -2.0;
+
+        // desired wrench - measured wrench
+        Vector6d error = h_d - h_e_;
+
+        // Equation 14 from exc sheet
+        z_tilde_f = z_tilde_f_m1 + Kf_ * error * dt;
+        z_tilde_f(2) = std::clamp(z_tilde_f(2), -0.10, 0.10);
+        // on first iteration the z_tilde_m1 is zero but lets store previous value
+        z_tilde_f_m1 = z_tilde_f;
+
+        // Apply selection matrix:
+        // x,y,rotations from pose control
+        // z from force control
+        Vector6d z_force = S_ * z_tilde_f;
+
+        // Convert to KDL::Twist for adddelta usage
+        KDL::Twist delta(
+            KDL::Vector( // translation
+                z_force(0),
+                z_force(1),
+                z_force(2)),
+            KDL::Vector( // rotation
+                z_force(3),
+                z_force(4),
+                z_force(5)));
+
+        KDL::Frame T_d = xd_kdl_;
+
+        // Force-controlled goal frame
+        KDL::Frame T_g = KDL::addDelta(T_d, delta, 1.0);
+
+        if (elapsed_time_ - last_force_debug_time_ >= 1.0) {
+            RCLCPP_INFO(get_node()->get_logger(),
+                        "Force z: desired=%.2f N measured=%.2f N error=%.2f N offset=%.4f m goal_z=%.4f m target_z=%.4f m actual_z=%.4f m",
+                        h_d(2), h_e_(2), error(2), z_tilde_f(2), T_d.p.z(), T_g.p.z(), x_kdl_.p.z());
+            last_force_debug_time_ = elapsed_time_;
+        }
+
+        // Inner-loop tracking error
+        xe_kdl_ = KDL::diff(x_kdl_, T_g);
     }
-    else {
-        // Error in task space
+    // Error in task space
+        else {
         xe_kdl_ = KDL::diff(x_kdl_, xd_kdl_);
     }
 
@@ -99,6 +144,38 @@ controller_interface::return_type DirectForceController::update(
     /**
      * TODO: compute tau_pos_ with inverse dynamics controller
      */
+    // Compute torque command using inverse dynamics
+
+    // Task-space position/orientation error
+    Vector6d x_tilde;
+    for (int i = 0; i < 6; ++i) {
+        x_tilde(i) = xe_kdl_(i);
+    }
+
+    // Desired task-space velocity and acceleration
+    Vector6d xd_dot = Vector6d::Zero();
+    Vector6d xd_ddot = Vector6d::Zero();
+
+    // Current task-space velocity
+    Vector6d x_dot = J_ * q_dot_;
+
+    // Desired task-space acceleration from the PD controller
+    Vector6d task_term =
+        M_d_ * xd_ddot
+        + Kd_ * (xd_dot - x_dot)
+        + Kp_ * x_tilde
+        - M_d_ * (J_dot_ * q_dot_);
+
+    Vector6d x_ddot_cmd = M_d_.inverse() * task_term;
+
+    // Map task-space acceleration to joint-space acceleration
+    Vector7d q_ddot_cmd = J_pinv_ * x_ddot_cmd;
+
+    // Joint-space inverse dynamics
+    // No measured wrench compensation here: force feedback is handled
+    // by the outer direct force control loop.
+    tau_pos_ = M_ * q_ddot_cmd + C_ + G_;
+
     tau_ = tau_pos_ + tau_null_;
 
     // Send torque commands to the hardware command interface
@@ -244,7 +321,8 @@ CallbackReturn DirectForceController::on_activate(
   const rclcpp_lifecycle::State& /*previous_state*/) {
     updateJointStates();
     elapsed_time_ = 0.0;
-
+    last_force_debug_time_ = 0.0;
+    // initial values for KDL variables
     M_kdl_.resize(NUM_JOINTS);
     G_kdl_.resize(NUM_JOINTS);
     C_kdl_.resize(NUM_JOINTS);
@@ -252,6 +330,14 @@ CallbackReturn DirectForceController::on_activate(
     J_dot_kdl_.resize(NUM_JOINTS);
     q_kdl_.resize(NUM_JOINTS);
     q_dot_kdl_.resize(NUM_JOINTS);
+    Kf_.setZero();
+    Kf_(2,2) = 0.01;
+    S_.diagonal() << 0, 0, 1.0, 0, 0, 0;
+    M_d_.diagonal() << 1.5, 1.5, 1.5, 0.1, 0.1, 0.1;
+    Kp_.diagonal() << 75,75,75,10,10,10;
+    Kd_.diagonal() << 24.7,24.7,24.7,2.5,2.5,2.5;
+    z_tilde_f.setZero();
+    z_tilde_f_m1.setZero();
 
     // Initialize realtime buffer
     auto xd = std::make_shared<KDL::Frame>();

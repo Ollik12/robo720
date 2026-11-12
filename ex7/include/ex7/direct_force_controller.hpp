@@ -76,6 +76,12 @@ class DirectForceController : public controller_interface::ControllerInterface {
         Vector7d tau_; // torque command
         Vector7d tau_pos_;
         Vector7d tau_null_;
+        
+        Vector6d z_tilde_f;  // z_tilde is difference between
+        //  force controlled desired frame TF and a position controlled desired frame Td
+        // previous state (m1 = minus1)
+        Vector6d z_tilde_f_m1;
+    
 
         // KDL variables
         KDL::JntSpaceInertiaMatrix M_kdl_;
@@ -88,8 +94,14 @@ class DirectForceController : public controller_interface::ControllerInterface {
         KDL::Frame x_kdl_;
         KDL::Frame xd_kdl_;
         KDL::Twist xe_kdl_;
+        Eigen::Matrix<double, NUM_TASK, NUM_TASK> Kf_;
+        Eigen::Matrix<double, NUM_TASK, NUM_TASK> S_;
+        Eigen::Matrix<double, NUM_TASK, NUM_TASK> M_d_;
+        Eigen::Matrix<double, NUM_TASK, NUM_TASK> Kp_;
+        Eigen::Matrix<double, NUM_TASK, NUM_TASK> Kd_;
 
         double elapsed_time_{0.0};
+        double last_force_debug_time_{0.0};
 
         // For writing the parameter on non-RT thread and reading it in RT update() loop
         std::atomic<bool> use_force_measurement_{false};

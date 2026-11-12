@@ -73,6 +73,9 @@ ros2 param set /admittance_controller use_force_measurement true --no-daemon
 
 ros2 param set /direct_force_controller use_force_measurement true --no-daemon
 ```
-
+```bash
+source install/setup.bash
+ros2 run goal_publishers pose_trajectory_publisher.py
+```
 
 Node name is either `impedance_controller`, `admittance_controller` or `direct_force_controller` and bool is either `true` or `false`.
