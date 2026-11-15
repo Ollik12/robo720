@@ -42,6 +42,16 @@ ament_target_dependencies(trajectory_publisher
   franka_kdl
 )
 
+# Python executables
+ament_python_install_package(${PROJECT_NAME})
+
+install(PROGRAMS
+  scripts/goal_pose_publisher.py
+  scripts/pose_trajectory_publisher.py
+  scripts/fake_wrench_publisher.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 # Install header files
 install(DIRECTORY include/
   DESTINATION include

@@ -598,16 +598,11 @@ void VisualController::publish_markers(
         marker.pose.orientation = obstacle.orientation;
         marker.color.r = 0.5f;
         marker.color.g = 0.5f;
-        marker.color.b = 0.5f;
+        marker.color.b = 240.0f;
         marker.color.a = 1.0f;
         marker.lifetime = rclcpp::Duration::from_nanoseconds(0);
 
-        if (obstacle.shape_type == custom_msgs::msg::Obstacle::SPHERE) {
-            marker.type = visualization_msgs::msg::Marker::SPHERE;
-            marker.scale.x = 2.0 * obstacle.radius;
-            marker.scale.y = 2.0 * obstacle.radius;
-            marker.scale.z = 2.0 * obstacle.radius;
-        } else if (obstacle.shape_type == custom_msgs::msg::Obstacle::BOX) {
+        if (obstacle.shape_type == custom_msgs::msg::Obstacle::BOX) {
             marker.type = visualization_msgs::msg::Marker::CUBE;
             marker.scale.x = obstacle.box_size.at(0);
             marker.scale.y = obstacle.box_size.at(1);
