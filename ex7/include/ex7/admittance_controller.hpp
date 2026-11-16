@@ -74,10 +74,22 @@ class AdmittanceController : public controller_interface::ControllerInterface {
         Vector7d q_;
         Vector7d q_dot_;
         Vector6d h_e_;  // external measured forces and torques
+        Vector6d h_e_d_;
         Vector6d h_e_old_;
         Vector7d tau_; // torque command
         Vector7d tau_pos_;
         Vector7d tau_null_;
+        Eigen::Matrix<double, NUM_TASK, NUM_TASK> M_t_;
+        Vector6d Kp_{20.0, 20.0, 20.0, 5.0, 5.0, 5.0};
+        Vector6d Kd_{10.0, 10.0, 10.0, 5.0, 5.0, 5.0};
+        Vector6d z_tilde_;
+        Vector6d z_tilde_dot_;
+        Vector6d z_tilde_ddot_;
+        Vector6d xe_;
+        Vector6d xe_dot_;
+        Vector7d u_;
+        Vector6d xd_dot_;
+        Vector6d xd_ddot_;
 
         // KDL variables
         KDL::JntSpaceInertiaMatrix M_kdl_;
@@ -89,6 +101,7 @@ class AdmittanceController : public controller_interface::ControllerInterface {
         KDL::JntArray q_dot_kdl_;
         KDL::Frame x_kdl_;
         KDL::Frame xd_kdl_;
+        KDL::Twist xe_kdl_;
 
         double elapsed_time_{0.0};
 

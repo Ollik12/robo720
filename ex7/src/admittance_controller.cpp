@@ -58,21 +58,64 @@ controller_interface::return_type AdmittanceController::update(
     h_e_old_ = h_e_;
 
     /**
-     * TODO: Rotate from sensor frame to desired pose frame.
-     * hint: we can do two separate rotations, like when chaining transforms
+     * Rotate the measurement vector from sensor frame to desired frame
      */
 
-    /**
-     * TODO: Compute the compliant frame.
-     * hint: use equations 11-13 from the assignment to get z_tilde and integrate
-     * to get compliant frame with code snippets shown in assignment.
-     * You can also use ODE solver to get z_tilde.
-     */
+    // Group force and torque into KDL::Wrench
+    const KDL::Wrench wrench_sensor(
+        KDL::Vector(h_e_(0), h_e_(1), h_e_(2)),
+        KDL::Vector(h_e_(3), h_e_(4), h_e_(5))
+    );
 
-    /**
-     * TODO: Compute error in task space.
-     */
+    // Rotate from sensor/EE axes directly into desired axes
+    // xd_kdl.M converts desired -> base, so we need opposite direction
+    // base -> desired. Use desired pose rotation matrix inverse:
+    const KDL::Rotation R_desired_sensor = xd_kdl_.M.Inverse() * x_kdl_.M;
+    const KDL::Wrench wrench_desired = R_desired_sensor * wrench_sensor;
 
+    // Forces and torques in desired frame
+    h_e_d_ << wrench_desired.force.x(),
+            wrench_desired.force.y(),
+            wrench_desired.force.z(),
+            wrench_desired.torque.x(),
+            wrench_desired.torque.y(),
+            wrench_desired.torque.z();
+
+    // Assignment equation (11)
+    z_tilde_ddot_ = M_t_.inverse() * (
+        h_e_d_ 
+        - Kd_.cwiseProduct(z_tilde_dot_) 
+        - Kp_.cwiseProduct(z_tilde_)
+    );
+
+    // Assignment equations (12) and (13)
+    const Vector6d z_tilde_dot_next = z_tilde_dot_ + z_tilde_ddot_ * dt;
+    const Vector6d z_tilde_next = z_tilde_+ z_tilde_dot_next * dt;
+
+    // Store state for the next control cycle
+    z_tilde_dot_ = z_tilde_dot_next;
+    z_tilde_ = z_tilde_next;
+
+    // Desired frame
+    KDL::Frame T_d = xd_kdl_;
+
+    // Convert z_tilde to KDL
+    KDL::Twist z_tilde_kdl(
+        KDL::Vector(z_tilde_next(0), z_tilde_next(1), z_tilde_next(2)),
+        KDL::Vector(z_tilde_next(3), z_tilde_next(4), z_tilde_next(5))
+    );
+
+    // Compliant frame (code from assignment instructions)
+    KDL::Frame T_t = T_d * KDL::addDelta(KDL::Frame::Identity(), -z_tilde_kdl, 1.0);
+
+    // Error between ee pose and compliant frame
+    xe_kdl_ = KDL::diff(x_kdl_, T_t);
+
+    // Pose error to Eigen
+    for (int i = 0; i < 6; i++) {
+        xe_(i) = xe_kdl_(i);
+    }
+    
     // Get dynamics parameters and Jacobian
     solver_->compute_dyn_params(q_kdl_, q_dot_kdl_, M_kdl_, G_kdl_, C_kdl_);
     solver_->compute_jac(q_kdl_, J_kdl_);
@@ -100,10 +143,17 @@ controller_interface::return_type AdmittanceController::update(
     Eigen::MatrixXd N = Eigen::MatrixXd::Identity(NUM_JOINTS, NUM_JOINTS) - J_.transpose() * J_bar.transpose();
     tau_null_ = N.transpose() * (-0.75 * q_dot_);
 
-    // Compute torque command
-    /**
-     * TODO: compute tau_pos_ with inverse dynamics controller
-     */
+    // Cartesian velocity error (xd_dot = 0 so this xe_dot becomes -J * q_dot)
+    xe_dot_ = xd_dot_ - (J_ * q_dot_);
+
+    // Compute the final torque command (in this case, xd_ddot = 0)
+    u_ = J_pinv_ * M_t_.inverse() * (
+        M_t_ * 
+        xd_ddot_ + 
+        Kd_.cwiseProduct(xe_dot_) + 
+        Kp_.cwiseProduct(xe_) - 
+        M_t_ * J_dot_ * q_dot_ - h_e_d_);
+    tau_pos_ = M_ * u_ + G_ + C_ + J_.transpose() * h_e_d_;
     tau_ = tau_pos_ + tau_null_;
 
     // Send torque commands to the hardware command interface
@@ -132,6 +182,19 @@ CallbackReturn AdmittanceController::on_init() {
         fprintf(stderr, "Exception thrown during init stage (on_init) with message: %s \n", e.what());
         return CallbackReturn::ERROR;
     }
+
+    // Initialize virtual mass matrix
+    M_t_.setZero();
+    M_t_.diagonal() << 1.0, 1.0, 1.0, 0.1, 0.1, 0.1;
+
+    // Initialize z_tilde variables
+    z_tilde_.setZero();
+    z_tilde_dot_.setZero();
+    z_tilde_ddot_.setZero();
+
+    // Set desired velocity and acceleration to zero
+    xd_dot_.setZero();
+    xd_ddot_.setZero();
 
     RCLCPP_INFO(get_node()->get_logger(), "Robot initialization done.");
     return CallbackReturn::SUCCESS;

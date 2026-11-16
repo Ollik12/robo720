@@ -48,7 +48,7 @@ controller_interface::return_type ImpedanceController::update(
     solver_->compute_dyn_params(q_kdl_, q_dot_kdl_, M_kdl_, G_kdl_, C_kdl_);
     solver_->compute_jac(q_kdl_, J_kdl_);
     solver_->compute_jac_dot(q_kdl_, q_dot_kdl_, J_dot_kdl_);
-
+    
     // Copy data to Eigen variables for matrix computations
     M_ = M_kdl_.data;
     G_ = G_kdl_.data;
@@ -57,6 +57,8 @@ controller_interface::return_type ImpedanceController::update(
     J_dot_ = J_dot_kdl_.data;
     q_ = q_kdl_.data;
     q_dot_ = q_dot_kdl_.data;
+
+    solver_->get_damped_pseudo_inverse(J_, J_pinv_);
 
     if (use_force_measurement_.load()) {
         // Read the force measurement
@@ -72,9 +74,24 @@ controller_interface::return_type ImpedanceController::update(
         h_e_old_ = h_e_;
 
         /**
-         * TODO: Rotate the measurement vector from sensor frame to base frame
-         * hint: h_e_ measurement consists of two 3D vectors
+         * Rotate the measurement vector from sensor frame to base frame
          */
+        const KDL::Wrench wrench_sensor(
+            KDL::Vector(h_e_(0), h_e_(1), h_e_(2)),
+            KDL::Vector(h_e_(3), h_e_(4), h_e_(5))
+        );
+
+        // Rotate from sensor/EE axes into base axes
+        const KDL::Rotation R_base_sensor = x_kdl_.M;
+        const KDL::Wrench wrench_base = R_base_sensor * wrench_sensor;
+
+        // h_e_ expressed in base-frame axes
+        h_e_ << wrench_base.force.x(),
+          wrench_base.force.y(),
+          wrench_base.force.z(),
+          wrench_base.torque.x(),
+          wrench_base.torque.y(),
+          wrench_base.torque.z();
     }
     else {
         h_e_ = Vector6d::Zero();
@@ -90,10 +107,25 @@ controller_interface::return_type ImpedanceController::update(
     Eigen::MatrixXd N = Eigen::MatrixXd::Identity(NUM_JOINTS, NUM_JOINTS) - J_.transpose() * J_bar.transpose();
     tau_null_ = N.transpose() * (-0.75 * q_dot_);
 
-    // Compute torque command
-    /**
-     * TODO: compute tau_pos_ as the torque command shown on lecture and assignment
-     */
+    // Pose error KDL
+    xe_kdl_ = KDL::diff(x_kdl_, xd_kdl_);
+
+    // Pose error to Eigen
+    for (int i = 0; i < 6; ++i) {
+        xe_(i) = xe_kdl_(i);
+    }
+
+    // Cartesian velocity error (xd_dot = 0 so this becomes -J * q_dot)
+    xe_dot_ = xd_dot_ - (J_ * q_dot_);
+
+    // Compute the final torque command (in this case, xd_ddot = 0)
+    u_ = J_pinv_ * Md_.inverse() * (
+        Md_ * xd_ddot_ 
+        + Kd_.cwiseProduct(xe_dot_) 
+        + Kp_.cwiseProduct(xe_) 
+        - Md_ * J_dot_ * q_dot_ - h_e_
+    );
+    tau_pos_ = M_ * u_ + G_ + C_ + J_.transpose() * h_e_;
     tau_ = tau_pos_ + tau_null_;
 
     // Send torque commands to the hardware command interface
@@ -123,6 +155,15 @@ CallbackReturn ImpedanceController::on_init() {
         fprintf(stderr, "Exception thrown during init stage (on_init) with message: %s \n", e.what());
         return CallbackReturn::ERROR;
     }
+
+    // Initialize off-diagonal values with zeros
+    Md_.setZero();
+    // Set diagonal values for virtual mass matrix Md
+    Md_.diagonal() << 1.0, 1.0, 1.0, 0.1, 0.1, 0.1;
+
+    // Initialize desired velocity and acceleration vectors to zero
+    xd_dot_.setZero();
+    xd_ddot_.setZero();
 
     RCLCPP_INFO(get_node()->get_logger(), "Robot initialization done.");
     return CallbackReturn::SUCCESS;
