@@ -112,6 +112,9 @@ controller_interface::return_type PotentialFieldController::update(
         const bool moving_towards_upper = grad_upper * q_dot_(i) < 0.0;
 
         // Avoid division by zero by ensuring distances are not too small
+        // Otherwise:
+        // Lower (D1) = (q - lower)²
+        // Upper (D2) = (q - upper)²
         const double D1 = std::max(D_min, d1 * d1);
         const double D2 = std::max(D_min, d2 * d2);
 
@@ -167,7 +170,8 @@ controller_interface::return_type PotentialFieldController::update(
                 // Vector from closest point to the avoidance point
                 Eigen::Vector3d surface_diff = p_point - p0;
 
-                // Squared distance to obstacle surface
+                // Squared distance between avoidance point
+                // and obstacle surface
                 double D_obs = surface_diff.dot(surface_diff);
 
                 // Gradient
@@ -195,7 +199,7 @@ controller_interface::return_type PotentialFieldController::update(
 
                 Eigen::Vector3d p0_rel = p_rel;
                 
-                // Clamp the point on the box surface
+                // Clamp the each coordinate to the box bounds
                 // (from the Flexible Box Library)
                 for (int i = 0; i < 3; ++i) {
                     if (p_rel(i) < -half_size(i)) {
@@ -212,7 +216,8 @@ controller_interface::return_type PotentialFieldController::update(
                 // Vector from closest point on the box to the avoidance point
                 Eigen::Vector3d diff = p_point - p0;
 
-                // Squared distance to box
+                // Squared distance between the box
+                // and the avoidance point
                 double D_obs = diff.dot(diff);
 
                 // Gradient

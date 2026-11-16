@@ -121,11 +121,11 @@ class PotentialFieldController : public controller_interface::ControllerInterfac
         Vector7d tau_; // final torque command
 
         double elapsed_time_{0.0};
-        double Q_star_joint_{0.01}; // (rad²) joint threshold
+        double Q_star_joint_{0.04}; // (rad²) joint threshold
         double Q_star_obs_{0.0625}; // (m²) obstacle threshold
-        double K_rep_joint_{0.01}; // repulsive gain for joints
+        double K_rep_joint_{0.1}; // repulsive gain for joints
         double K_rep_obs_{0.001}; // repulsive gain for obstacles
-        double B_rep_{0.1}; // repulsive damping coefficient
+        double B_rep_{1.0}; // repulsive damping coefficient
         double D_min{1e-4}; // minimum distance to joint limit for repulsive force (avoid division by zero)
         // Subscriber callbacks
         void goal_pose_callback(const std::shared_ptr<geometry_msgs::msg::PoseStamped> msg);
