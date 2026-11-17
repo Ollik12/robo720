@@ -83,8 +83,8 @@ class ImpedanceController : public controller_interface::ControllerInterface {
         Vector6d xd_ddot_;
         Vector6d xe_dot_;
         Vector7d u_;
-        Vector6d Kp_{20.0, 20.0, 20.0, 5.0, 5.0, 5.0};
-        Vector6d Kd_{10.0, 10.0, 10.0, 5.0, 5.0, 5.0};
+        Vector6d Kp_{90.0, 90.0, 90.0, 3.6, 3.6, 3.6};
+        Vector6d Kd_{30.0, 30.0, 30.0, 1.2, 1.2, 1.2};
         Eigen::Matrix<double, NUM_TASK, NUM_TASK> Md_;
 
         // KDL variables

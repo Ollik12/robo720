@@ -76,6 +76,8 @@ controller_interface::return_type ImpedanceController::update(
         /**
          * Rotate the measurement vector from sensor frame to base frame
          */
+
+        // Group force and torque into KDL::Wrench
         const KDL::Wrench wrench_sensor(
             KDL::Vector(h_e_(0), h_e_(1), h_e_(2)),
             KDL::Vector(h_e_(3), h_e_(4), h_e_(5))
@@ -106,6 +108,10 @@ controller_interface::return_type ImpedanceController::update(
     Eigen::MatrixXd J_bar = M_inv * J_.transpose() * Lambda_inv.inverse();
     Eigen::MatrixXd N = Eigen::MatrixXd::Identity(NUM_JOINTS, NUM_JOINTS) - J_.transpose() * J_bar.transpose();
     tau_null_ = N.transpose() * (-0.75 * q_dot_);
+
+    /**
+     * compute tau_pos_ with inverse dynamics controller
+     */
 
     // Pose error KDL
     xe_kdl_ = KDL::diff(x_kdl_, xd_kdl_);
@@ -155,15 +161,6 @@ CallbackReturn ImpedanceController::on_init() {
         fprintf(stderr, "Exception thrown during init stage (on_init) with message: %s \n", e.what());
         return CallbackReturn::ERROR;
     }
-
-    // Initialize off-diagonal values with zeros
-    Md_.setZero();
-    // Set diagonal values for virtual mass matrix Md
-    Md_.diagonal() << 1.0, 1.0, 1.0, 0.1, 0.1, 0.1;
-
-    // Initialize desired velocity and acceleration vectors to zero
-    xd_dot_.setZero();
-    xd_ddot_.setZero();
 
     RCLCPP_INFO(get_node()->get_logger(), "Robot initialization done.");
     return CallbackReturn::SUCCESS;
@@ -310,6 +307,15 @@ CallbackReturn ImpedanceController::on_activate(
     rt_force_torque_.writeFromNonRT(h_e_ptr);
     rt_fake_wrench_.writeFromNonRT(h_e_ptr);
     h_e_old_ = Vector6d::Zero();
+
+    // Initialize off-diagonal values with zeros
+    Md_.setZero();
+    // Set diagonal values for virtual mass matrix Md
+    Md_.diagonal() << 2.5, 2.5, 2.5, 0.1, 0.1, 0.1;
+
+    // Initialize desired velocity and acceleration vectors to zero
+    xd_dot_.setZero();
+    xd_ddot_.setZero();
 
     return CallbackReturn::SUCCESS;
 }

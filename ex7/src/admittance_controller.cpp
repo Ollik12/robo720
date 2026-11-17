@@ -143,16 +143,20 @@ controller_interface::return_type AdmittanceController::update(
     Eigen::MatrixXd N = Eigen::MatrixXd::Identity(NUM_JOINTS, NUM_JOINTS) - J_.transpose() * J_bar.transpose();
     tau_null_ = N.transpose() * (-0.75 * q_dot_);
 
+    /**
+     * compute tau_pos_ with inverse dynamics controller
+     */
+
     // Cartesian velocity error (xd_dot = 0 so this xe_dot becomes -J * q_dot)
     xe_dot_ = xd_dot_ - (J_ * q_dot_);
 
     // Compute the final torque command (in this case, xd_ddot = 0)
     u_ = J_pinv_ * M_t_.inverse() * (
-        M_t_ * 
-        xd_ddot_ + 
-        Kd_.cwiseProduct(xe_dot_) + 
-        Kp_.cwiseProduct(xe_) - 
-        M_t_ * J_dot_ * q_dot_ - h_e_d_);
+        M_t_ * xd_ddot_ 
+        + Kd_.cwiseProduct(xe_dot_)  
+        + Kp_.cwiseProduct(xe_) 
+        - M_t_ * J_dot_ * q_dot_ - h_e_d_
+    );
     tau_pos_ = M_ * u_ + G_ + C_ + J_.transpose() * h_e_d_;
     tau_ = tau_pos_ + tau_null_;
 
@@ -182,19 +186,6 @@ CallbackReturn AdmittanceController::on_init() {
         fprintf(stderr, "Exception thrown during init stage (on_init) with message: %s \n", e.what());
         return CallbackReturn::ERROR;
     }
-
-    // Initialize virtual mass matrix
-    M_t_.setZero();
-    M_t_.diagonal() << 1.0, 1.0, 1.0, 0.1, 0.1, 0.1;
-
-    // Initialize z_tilde variables
-    z_tilde_.setZero();
-    z_tilde_dot_.setZero();
-    z_tilde_ddot_.setZero();
-
-    // Set desired velocity and acceleration to zero
-    xd_dot_.setZero();
-    xd_ddot_.setZero();
 
     RCLCPP_INFO(get_node()->get_logger(), "Robot initialization done.");
     return CallbackReturn::SUCCESS;
@@ -335,6 +326,19 @@ CallbackReturn AdmittanceController::on_activate(
     rt_force_torque_.writeFromNonRT(h_e_ptr);
     rt_fake_wrench_.writeFromNonRT(h_e_ptr);
     h_e_old_ = Vector6d::Zero();
+
+    // Initialize virtual mass matrix
+    M_t_.setZero();
+    M_t_.diagonal() << 2.5, 2.5, 2.5, 0.1, 0.1, 0.1;
+
+    // Initialize z_tilde variables
+    z_tilde_.setZero();
+    z_tilde_dot_.setZero();
+    z_tilde_ddot_.setZero();
+
+    // Set desired velocity and acceleration to zero
+    xd_dot_.setZero();
+    xd_ddot_.setZero();
 
     return CallbackReturn::SUCCESS;
 }

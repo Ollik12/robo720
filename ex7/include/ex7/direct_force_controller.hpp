@@ -69,6 +69,7 @@ class DirectForceController : public controller_interface::ControllerInterface {
         Eigen::Matrix<double, NUM_TASK, NUM_JOINTS> J_;
         Eigen::Matrix<double, NUM_JOINTS, NUM_TASK> J_pinv_;
         Eigen::Matrix<double, NUM_TASK, NUM_JOINTS> J_dot_;
+        Eigen::Matrix<double, NUM_TASK, NUM_TASK> S_; // Selection matrix
         Vector7d q_;
         Vector7d q_dot_;
         Vector6d h_e_;  // external measured forces and torques
@@ -76,6 +77,17 @@ class DirectForceController : public controller_interface::ControllerInterface {
         Vector7d tau_; // torque command
         Vector7d tau_pos_;
         Vector7d tau_null_;
+        Vector6d Kf_{0.0, 0.0, 0.1, 0.0, 0.0, 0.0};
+        Vector6d h_d_{0.0, 0.0, -1.0, 0.0, 0.0, 0.0}; // desired wrench -z-direction
+        Vector6d z_tilde_f_;
+        Vector6d xe_;
+        Vector6d xe_dot_;
+        Vector6d xd_dot_;
+        Vector6d xd_ddot_;
+        Vector7d u_;
+        Eigen::Matrix<double, NUM_TASK, NUM_TASK> M_d_;
+        Vector6d Kp_{36.0, 36.0, 36.0, 3.6, 3.6, 3.6};
+        Vector6d Kd_{12.0, 12.0, 12.0, 1.2, 1.2, 1.2};
 
         // KDL variables
         KDL::JntSpaceInertiaMatrix M_kdl_;
@@ -88,6 +100,7 @@ class DirectForceController : public controller_interface::ControllerInterface {
         KDL::Frame x_kdl_;
         KDL::Frame xd_kdl_;
         KDL::Twist xe_kdl_;
+        KDL::Frame T_g_; // Goal frame
 
         double elapsed_time_{0.0};
 

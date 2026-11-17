@@ -80,8 +80,8 @@ class AdmittanceController : public controller_interface::ControllerInterface {
         Vector7d tau_pos_;
         Vector7d tau_null_;
         Eigen::Matrix<double, NUM_TASK, NUM_TASK> M_t_;
-        Vector6d Kp_{20.0, 20.0, 20.0, 5.0, 5.0, 5.0};
-        Vector6d Kd_{10.0, 10.0, 10.0, 5.0, 5.0, 5.0};
+        Vector6d Kp_{90.0, 90.0, 90.0, 3.6, 3.6, 3.6};
+        Vector6d Kd_{30.0, 30.0, 30.0, 1.2, 1.2, 1.2};
         Vector6d z_tilde_;
         Vector6d z_tilde_dot_;
         Vector6d z_tilde_ddot_;

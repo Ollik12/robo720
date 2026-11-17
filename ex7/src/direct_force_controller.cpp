@@ -53,15 +53,62 @@ controller_interface::return_type DirectForceController::update(
         h_e_old_ = h_e_;
 
         /**
-         * TODO: Rotate sensor measurement from sensor frame to base frame
+         *  Rotate sensor measurement from sensor frame to base frame
          */
 
+        // Group force and torque into KDL::Wrench
+        const KDL::Wrench wrench_sensor(
+            KDL::Vector(h_e_(0), h_e_(1), h_e_(2)),
+            KDL::Vector(h_e_(3), h_e_(4), h_e_(5))
+        );
+
+        // Rotate from sensor/EE axes into base axes
+        const KDL::Rotation R_base_sensor = x_kdl_.M;
+        const KDL::Wrench wrench_base = R_base_sensor * wrench_sensor;
+
+        // h_e_ expressed in base-frame axes
+        h_e_ << wrench_base.force.x(),
+          wrench_base.force.y(),
+          wrench_base.force.z(),
+          wrench_base.torque.x(),
+          wrench_base.torque.y(),
+          wrench_base.torque.z();
+
         /**
-         * TODO: Compute force controlled desired frame T_f.
+         * Compute force controlled desired frame T_f.
          * hint: integrate the error between measured and desired force with equation 14.
          * Don't forget about the selection matrix S.
          * Then compute the error in task space.
          */
+
+        // Error between measured and desired force
+        Vector6d h_err = h_d_ - h_e_;
+
+        // Equation (14) from the assignment
+        const Vector6d z_tilde_f_next = z_tilde_f_ + Kf_.cwiseProduct(h_err) * dt;
+
+        // Store state for next control cycle
+        z_tilde_f_ = z_tilde_f_next;
+
+        // Multiple z_tilde with selection matrix
+        const Vector6d z_tilde_f_selected = S_ * z_tilde_f_next;
+
+        // Convert S * z_tilde_f to KDL
+        KDL::Twist z_tilde_kdl(
+            KDL::Vector(z_tilde_f_selected(0), z_tilde_f_selected(1), z_tilde_f_selected(2)),
+            KDL::Vector(z_tilde_f_selected(3), z_tilde_f_selected(4), z_tilde_f_selected(5))
+        );
+
+        // Position controlled desired frame
+        KDL::Frame T_d = xd_kdl_;
+
+        // Force controlled desired frame (from assignment code snippet)
+        // This will follow trajectory in xy plane while pushing down
+        T_g_ = KDL::addDelta(T_d, z_tilde_kdl, 1.0);
+
+        // Error between currect ee pose and the goal frame
+        xe_kdl_ = KDL::diff(x_kdl_, T_g_);
+
     }
     else {
         // Error in task space
@@ -95,10 +142,28 @@ controller_interface::return_type DirectForceController::update(
     Eigen::MatrixXd N = Eigen::MatrixXd::Identity(NUM_JOINTS, NUM_JOINTS) - J_.transpose() * J_bar.transpose();
     tau_null_ = N.transpose() * (-0.75 * q_dot_);
 
-    // Compute torque command
     /**
-     * TODO: compute tau_pos_ with inverse dynamics controller
+     * compute tau_pos_ with inverse dynamics controller
      */
+
+    // Pose error to Eigen
+    for (int i = 0; i < 6; i++) {
+        xe_(i) = xe_kdl_(i);
+    }
+
+    // Cartesian velocity error (xd_dot = 0 so this xe_dot becomes -J * q_dot)
+    xe_dot_ = xd_dot_ - (J_ * q_dot_);
+
+    // Compute the final torque command (in this case, xd_ddot = 0)
+    u_ = J_pinv_ * M_d_.inverse() * (
+        M_d_ * xd_ddot_ 
+        + Kd_.cwiseProduct(xe_dot_) 
+        + Kp_.cwiseProduct(xe_) 
+        - M_d_ * J_dot_ * q_dot_
+    );
+    tau_pos_ = M_ * u_ + G_ + C_;
+    tau_ = tau_pos_ + tau_null_;
+    
     tau_ = tau_pos_ + tau_null_;
 
     // Send torque commands to the hardware command interface
@@ -252,6 +317,18 @@ CallbackReturn DirectForceController::on_activate(
     J_dot_kdl_.resize(NUM_JOINTS);
     q_kdl_.resize(NUM_JOINTS);
     q_dot_kdl_.resize(NUM_JOINTS);
+
+    // Initialize selection matrix diagonal elements
+    S_.setZero();
+    S_.diagonal() << 0.0, 0.0, 1.0, 0.0, 0.0, 0.0;
+
+    // Initialize virtual mass matrix diagonal elements
+    M_d_.setZero();
+    M_d_.diagonal() << 1.0, 1.0, 1.0, 0.1, 0.1, 0.1;
+
+    // Intialize desired velocity and accelereration vectors to zero
+    xd_dot_.setZero();
+    xd_ddot_.setZero();
 
     // Initialize realtime buffer
     auto xd = std::make_shared<KDL::Frame>();
