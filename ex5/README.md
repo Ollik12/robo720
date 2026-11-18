@@ -42,6 +42,7 @@ ros2 run ex5 gripper_command.py open
 ```bash
 source install/setup.bash
 ros2 param set --no-daemon /visual_controller use_marker_top_pose true
+ros2 param set /visual_controller use_marker_top_pose true
 ```
 In marker mode, the controller follows the wave until the marker is detected. Disable marker mode to return to the goal pose or wave:
 ```bash
@@ -50,3 +51,7 @@ ros2 param set --no-daemon /visual_controller use_marker_top_pose false
 
 
 So got to pose o, enable use marker pose then we go on top of the marker automatically.
+
+
+TODO:
+lisää joku pöytä johon noi cubet tiputetaan komeesti ja sitten lisää samalla tavalla ne siniset jutut miten Iikka teki siin obstacle avoidancessa.

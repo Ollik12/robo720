@@ -29,8 +29,9 @@ controller_interface::return_type VisualController::update(
   const rclcpp::Duration& period) {
     // Update joint states from hardware state interface
     updateJointStates();
-    const auto& obstacles = *rt_obstacles_.readFromRT();
 
+    tau_rep_.setZero();
+    const auto& obstacles = *rt_obstacles_.readFromRT();
     const double dt = period.seconds();
     elapsed_time_ = elapsed_time_ + dt;
     // Save current state to KDL variables for solvers
@@ -75,12 +76,13 @@ controller_interface::return_type VisualController::update(
 
             // Lower the TCP slightly so the fingers can reach around the cube.
             xd_kdl_.p = T_Base_Marker.p +
-                T_Base_Marker.M * KDL::Vector(0.0, -0.01, 0.0);
+                T_Base_Marker.M * KDL::Vector(0.03, -0.02, 0.0);
             xd_kdl_.p.z(xd_kdl_.p.z() + marker_approach_height_);
 
             // NOTE: end effector orientation is rotated by PI compared to the aruco marker
             // so let's rotate the marker orientation by PI around X axis to align with the end effector orientation
-            xd_kdl_.M = T_Base_Marker.M * KDL::Rotation::RotX(M_PI);
+            //xd_kdl_.M = T_Base_Marker.M * KDL::Rotation::RotX(M_PI);
+            xd_kdl_.M = x_kdl_.M;
             marker_tracking_active_ = true;
         }
     } else if (!marker_tracking_active_) {
@@ -111,14 +113,27 @@ controller_interface::return_type VisualController::update(
     q_ = q_kdl_.data;
     q_dot_ = q_dot_kdl_.data;
 
-    xe_(0) = xe_kdl_.vel.x(); xe_(1) = xe_kdl_.vel.y(); xe_(2) = xe_kdl_.vel.z();
-    xe_(3) = xe_kdl_.rot.x(); xe_(4) = xe_kdl_.rot.y(); xe_(5) = xe_kdl_.rot.z();
+    xe_(0) = xe_kdl_.vel.x();
+    xe_(1) = xe_kdl_.vel.y();
+    xe_(2) = xe_kdl_.vel.z();
+    xe_(3) = xe_kdl_.rot.x();
+    xe_(4) = xe_kdl_.rot.y();
+    xe_(5) = xe_kdl_.rot.z();
 
+    // Jacobian pseudo-inverse
     solver_->get_damped_pseudo_inverse(J_, J_pinv_);
+
+    // Desired end effector velocity
     xd_dot_ = Kp_.cwiseProduct(xe_);
+
+    // Joint velocity command
     q_dot_cmd_ = J_pinv_ * xd_dot_;
+
+    // Joint space PD + computed torque
     e_dot_ = q_dot_cmd_ - q_dot_;
+
     u_ = Kd_.cwiseProduct(e_dot_);
+
     tau_att_ = M_ * u_ + G_ + C_;
 
     // Joint limits as artificial potential field
@@ -205,8 +220,20 @@ controller_interface::return_type VisualController::update(
             }
         }
     }
+    Eigen::Matrix<double, NUM_JOINTS, NUM_JOINTS> I =
+        Eigen::Matrix<double, NUM_JOINTS, NUM_JOINTS>::Identity();
 
-    tau_ = tau_att_ + tau_rep_; // TODO: add repulsive control for obstacle avoidance from task space into here aswell!
+    Eigen::Matrix<double, NUM_JOINTS, NUM_JOINTS> N =
+        I - J_pinv_ * J_;
+ 
+    Vector7d q_posture_error =
+        q_home_ - q_;
+
+    tau_null_ =
+        N.transpose() *
+        (5.0 * q_posture_error - 2.0 * q_dot_);
+
+    tau_ = tau_att_ + tau_rep_ + tau_null_; // TODO: add repulsive control for obstacle avoidance from task space into here aswell!
 
     // Send torque commands to the hardware command interface
     for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
@@ -427,6 +454,10 @@ CallbackReturn VisualController::on_activate(
 
     for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
         q_kdl_(i) = position_interface_vals_(i);
+    }
+    for (size_t i = 0; i < NUM_JOINTS; i++)
+    {
+        q_home_(i) = position_interface_vals_(i);
     }
 
     T_cam_marker_ = KDL::Frame::Identity();

@@ -98,7 +98,9 @@ class VisualController : public controller_interface::ControllerInterface {
         Vector7d u_;
         Vector7d tau_att_; // attractive torque command
         Vector7d tau_rep_; // repulsive torque command
+        Vector7d tau_null_; // null space torque command
         Vector7d tau_; // total torque command
+        Vector7d q_home_;
 
         // KDL variables
         KDL::JntSpaceInertiaMatrix M_kdl_;
@@ -116,7 +118,7 @@ class VisualController : public controller_interface::ControllerInterface {
         double elapsed_time_{0.0};
         double initial_timeout_{0.0};
         double marker_lost_time_{0.0};
-        double marker_approach_height_{0.12};
+        double marker_approach_height_{0.11};
         bool marker_tracking_active_{false};
 
         std::vector<double> p_gains_;
