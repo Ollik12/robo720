@@ -76,7 +76,7 @@ controller_interface::return_type VisualController::update(
 
             // Lower the TCP slightly so the fingers can reach around the cube.
             xd_kdl_.p = T_Base_Marker.p +
-                T_Base_Marker.M * KDL::Vector(0.03, -0.02, 0.0);
+                T_Base_Marker.M * KDL::Vector(0.01, -0.015, 0.0);
             xd_kdl_.p.z(xd_kdl_.p.z() + marker_approach_height_);
 
             // NOTE: end effector orientation is rotated by PI compared to the aruco marker

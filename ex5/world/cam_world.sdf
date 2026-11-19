@@ -296,6 +296,18 @@
       <pose> 0.65 0 0.49 0 0 0</pose>
     </include> 
 
+    <include>
+      <uri>model://table</uri>
+      <name>table2</name>
+      <pose> 0.15 0.62 0.49 0 0 1.5708</pose>
+    </include> 
+
+    <include>
+      <uri>model://table</uri>
+      <name>table3</name>
+      <pose> 0.15 -0.62 0.49 0 0 1.5708</pose>
+    </include> 
+
     <!-- 3D scene 
     extra tables for testing
     <include>
