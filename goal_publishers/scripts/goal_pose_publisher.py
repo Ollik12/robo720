@@ -34,8 +34,8 @@ class GoalPosePublisher(Node):
             '8' : [0.6, -0.5, 1.3, np.pi, 0.0, -np.pi/4],
             'v' : [0.7, 0.0, 1.6, np.pi, 0.0, -np.pi/2],
             'o' : [0.7, 0.0, 1.5, np.pi, 0.0, 0.0],
-            'g' : [0.2, 0.6, 1.3, np.pi, 0.0, np.pi/2],
-            'i' : [0.2, -0.6, 1.3, np.pi, 0.0, -np.pi/2],
+            'g' : [0.2, 0.6, 1.5, np.pi, 0.0, np.pi/2],
+            'i' : [0.2, -0.6, 1.5, np.pi, 0.0, -np.pi/2],
         }
 
     def timer_callback(self):
