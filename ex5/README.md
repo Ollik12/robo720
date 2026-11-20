@@ -1,12 +1,13 @@
-# Exercise 5: Visual servoing
+# Final demo
+So in this final demo I have implemented marker tracking based on exercise 5 functionality. So we get cam_to_marker frame from a box with an aruco marker on top with a camera installed in the robot's wrist. Then we transform it to base_to_marker so we can give marker's position as a goal pose to our robot and we add a marker approach height of 7cm.
 
-To get the latest changes in the repo to your local directory, navigate to the course directory in your terminal, run `git pull`, and resolve all possible merge conflicts (you may save your own edits, but in the future it is possible that the templates will not work with your code). If you want to save your own code separately and just get the fresh template, navigate to your home directory and run:
+General robot motion control is implemented as attractive torque
+with cartesian task-space controller with joint space torque control so what is used in exercise 5.
 
-```bash
-git clone https://github.com/tau-alma/robo720_2026.git
-```
+We have also implemented repulsive torque control based on exercise 6. So we have joint limits as artificial potential field and the actual obstacles as objects to avoid. These all are included in tau_rep and added to total torque command. In addition to this, we calculate Null space stabilizing torque as tau_null and add that also to the total torque command. This makes sure that some of the joints dont move when EE is in the goal pose.
 
-Once inside container again, navigate to `ros2_ws` and build and source the packages:
+So with using these functionalities the idea of this final demo is to have a workcell around the robot, use the camera to find the boxes, go on top of boxes and then grab the boxes for pick and place task. But in the workcell, someone has placed two beams that are in the way of our box placing goals so this is why we have obstacle avoidance. Gripper is included as the end effector.
+
 
 ```bash
 cd ~/ros2_ws
@@ -51,7 +52,3 @@ ros2 param set --no-daemon /visual_controller use_marker_top_pose false
 
 
 So got to pose o, enable use marker pose then we go on top of the marker automatically.
-
-
-TODO:
-lisää joku pöytä johon noi cubet tiputetaan komeesti ja sitten lisää samalla tavalla ne siniset jutut miten Iikka teki siin obstacle avoidancessa.

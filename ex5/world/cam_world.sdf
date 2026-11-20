@@ -332,13 +332,13 @@
     <include>
       <uri>model://marker_cube</uri>
       <name>marker_cube</name>
-      <pose>0.7 0 1.118 0 0 0</pose>
+      <pose>0.735 0 1.218 0 0 0</pose>
     </include>
 
     <include>
       <uri>model://marker_cube</uri>
       <name>marker_cube1</name>
-      <pose>0.7 0 1.268 0 0 0</pose>
+      <pose>0.74 0 1.368 0 0 0</pose>
     </include>
 
     <model name="obstacle_w1">

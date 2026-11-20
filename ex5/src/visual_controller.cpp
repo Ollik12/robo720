@@ -100,12 +100,12 @@ controller_interface::return_type VisualController::update(
     }
 
     // Gripping is done via terminal
-
+    // Get the error in task space
     xe_kdl_ = KDL::diff(x_kdl_, xd_kdl_);
-
+    // Get dynamics parameters and Jacobian
     solver_->compute_dyn_params(q_kdl_, q_dot_kdl_, M_kdl_, G_kdl_, C_kdl_);
     solver_->compute_jac(q_kdl_, J_kdl_);
-
+    // Copy data to Eigen variables for matrix computations
     M_ = M_kdl_.data;
     G_ = G_kdl_.data;
     C_ = C_kdl_.data;
@@ -113,12 +113,8 @@ controller_interface::return_type VisualController::update(
     q_ = q_kdl_.data;
     q_dot_ = q_dot_kdl_.data;
 
-    xe_(0) = xe_kdl_.vel.x();
-    xe_(1) = xe_kdl_.vel.y();
-    xe_(2) = xe_kdl_.vel.z();
-    xe_(3) = xe_kdl_.rot.x();
-    xe_(4) = xe_kdl_.rot.y();
-    xe_(5) = xe_kdl_.rot.z();
+    xe_(0) = xe_kdl_.vel.x(), xe_(1) = xe_kdl_.vel.y(), xe_(2) = xe_kdl_.vel.z();
+    xe_(3) = xe_kdl_.rot.x(), xe_(4) = xe_kdl_.rot.y(), xe_(5) = xe_kdl_.rot.z();
 
     // Jacobian pseudo-inverse
     solver_->get_damped_pseudo_inverse(J_, J_pinv_);
@@ -233,7 +229,7 @@ controller_interface::return_type VisualController::update(
         N.transpose() *
         (5.0 * q_posture_error - 2.0 * q_dot_);
 
-    tau_ = tau_att_ + tau_rep_ + tau_null_; // TODO: add repulsive control for obstacle avoidance from task space into here aswell!
+    tau_ = tau_att_ + tau_rep_ + tau_null_; 
 
     // Send torque commands to the hardware command interface
     for (std::size_t i = 0; i < NUM_JOINTS; ++i) {
